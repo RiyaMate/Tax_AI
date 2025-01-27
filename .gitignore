@@ -1,0 +1,6 @@
+.vercel
+.DS_Store
+.env
+.streamlit/
+venv/
+api/__pycache__/main.cpython-312.pyc
