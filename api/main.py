@@ -23,7 +23,7 @@ async def health_check() -> Dict[str, str]:
     """
     Health check endpoint to verify the service is running
     """
-    return {"status": "healthy", "message": "Service is running"}
+    return {"status": "healthy", "message": "Service is running! All good!!!"}
 
 @app.get("/")
 async def root() -> Dict[str, str]:
