@@ -43,3 +43,19 @@ async def get_demo_env() -> Dict[str, str]:
     """
     demo_value = os.getenv("DEMO_VALUE", "default_value")
     return {"env_variable": "DEMO_VALUE", "value": demo_value}
+
+@app.post("/upload-pdf")
+async def upload_pdf(file: UploadFile = File(...)) -> Dict[str, str]:
+    """
+    Endpoint to upload a PDF file
+    """
+    if file.content_type != "application/pdf":
+        raise HTTPException(status_code=400, detail="Only PDF files are allowed")
+    
+    save_path = os.path.join("uploaded_pdfs", file.filename)
+    os.makedirs("uploaded_pdfs", exist_ok=True)
+    
+    with open(save_path, "wb") as buffer:
+        buffer.write(await file.read())
+    
+    return {"filename": file.filename, "message": "PDF uploaded successfully!"}
