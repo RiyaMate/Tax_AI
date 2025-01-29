@@ -64,7 +64,13 @@ async def upload_pdf(file: UploadFile = File(...)) -> Dict[str, str]:
     """
     if file.content_type != "application/pdf":
         raise HTTPException(status_code=400, detail="Only PDF files are allowed")
-    
+
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Uploaded file has no name")
+
+    if not S3_BUCKET:
+        raise HTTPException(status_code=500, detail="S3_BUCKET environment variable is missing")
+
     try:
         s3_client.upload_fileobj(file.file, S3_BUCKET, file.filename)
         file_url = f"https://{S3_BUCKET}.s3.amazonaws.com/{file.filename}"
@@ -72,4 +78,4 @@ async def upload_pdf(file: UploadFile = File(...)) -> Dict[str, str]:
     except NoCredentialsError:
         raise HTTPException(status_code=500, detail="AWS credentials not found")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
