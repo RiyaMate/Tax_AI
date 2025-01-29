@@ -1,14 +1,25 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, UploadFile, File, HTTPException
-
+from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict
 import os
+import boto3
+from botocore.exceptions import NoCredentialsError
+
+# AWS S3 Configuration
+S3_BUCKET = os.getenv("S3_BUCKET")
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+
+s3_client = boto3.client(
+    "s3",
+    aws_access_key_id=AWS_ACCESS_KEY_ID,
+    aws_secret_access_key=AWS_SECRET_ACCESS_KEY
+)
 
 # Create FastAPI instance
 app = FastAPI(
     title="Lab Demo API",
-    description="Simple FastAPI application with health check"
+    description="Simple FastAPI application with health check and PDF upload to S3"
 )
 
 # Configure CORS
@@ -49,15 +60,16 @@ async def get_demo_env() -> Dict[str, str]:
 @app.post("/upload-pdf")
 async def upload_pdf(file: UploadFile = File(...)) -> Dict[str, str]:
     """
-    Endpoint to upload a PDF file
+    Endpoint to upload a PDF file to AWS S3
     """
     if file.content_type != "application/pdf":
         raise HTTPException(status_code=400, detail="Only PDF files are allowed")
     
-    save_path = os.path.join("uploaded_pdfs", file.filename)
-    os.makedirs("uploaded_pdfs", exist_ok=True)
-    
-    with open(save_path, "wb") as buffer:
-        buffer.write(await file.read())
-    
-    return {"filename": file.filename, "message": "PDF uploaded successfully!"}
+    try:
+        s3_client.upload_fileobj(file.file, S3_BUCKET, file.filename)
+        file_url = f"https://{S3_BUCKET}.s3.amazonaws.com/{file.filename}"
+        return {"filename": file.filename, "message": "PDF uploaded successfully!", "file_url": file_url}
+    except NoCredentialsError:
+        raise HTTPException(status_code=500, detail="AWS credentials not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

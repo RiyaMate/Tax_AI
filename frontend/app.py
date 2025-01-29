@@ -31,6 +31,15 @@ def call_env_demo_endpoint():
     except requests.RequestException as e:
         return {"error": str(e)}
 
+def upload_pdf(file):
+    """Call the upload PDF endpoint"""
+    try:
+        files = {"file": (file.name, file.getvalue(), "application/pdf")}
+        response = requests.post(f"{BASE_URL}/upload-pdf", files=files)
+        return response.json()
+    except requests.RequestException as e:
+        return {"error": str(e)}
+
 # Main app
 st.title("🔬 Lab3 Demo")
 st.write("A simple demo showcasing FastAPI endpoints with environment variables")
@@ -56,8 +65,18 @@ with col3:
         response = call_env_demo_endpoint()
         st.json(response)
 
+# File upload section
+st.subheader("Upload a PDF File")
+uploaded_file = st.file_uploader("Choose a PDF file", type=["pdf"])
+if uploaded_file:
+    st.write(f"File selected: {uploaded_file.name}")
+    if st.button("Upload PDF"):
+        response = upload_pdf(uploaded_file)
+        st.json(response)
+        st.rerun()
+
 # Add some information about the configuration
-st.divider()
+st.markdown("---")
 st.subheader("Configuration")
 st.write(f"Backend URL: `{BASE_URL}`")
 st.info("The backend URL is configured using .streamlit/secrets.toml")
