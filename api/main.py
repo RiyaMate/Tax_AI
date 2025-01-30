@@ -57,25 +57,50 @@ async def get_demo_env() -> Dict[str, str]:
     demo_value = os.getenv("DEMO_VALUE", "default_value")
     return {"env_variable": "DEMO_VALUE", "value": demo_value}
 
+# Global dictionary to store the latest uploaded file URL
+uploaded_files = {}
+
 @app.post("/upload-pdf")
 async def upload_pdf(file: UploadFile = File(...)) -> Dict[str, str]:
     """
-    Endpoint to upload a PDF file to AWS S3
+    Endpoint to upload a PDF file to AWS S3 and download locally
     """
     if file.content_type != "application/pdf":
         raise HTTPException(status_code=400, detail="Only PDF files are allowed")
-
+    
     if not file.filename:
         raise HTTPException(status_code=400, detail="Uploaded file has no name")
 
     if not S3_BUCKET:
         raise HTTPException(status_code=500, detail="S3_BUCKET environment variable is missing")
-
+    
     try:
         s3_client.upload_fileobj(file.file, S3_BUCKET, file.filename)
         file_url = f"https://{S3_BUCKET}.s3.amazonaws.com/{file.filename}"
-        return {"filename": file.filename, "message": "PDF uploaded successfully!", "file_url": file_url}
+
+        # Store the file URL in a global dictionary
+        uploaded_files[file.filename] = file_url
+        
+        # Download the file locally after upload
+        local_path = os.path.join(os.getcwd(), file.filename)
+        response = requests.get(file_url)
+        response.raise_for_status()
+        with open(local_path, "wb") as f:
+            f.write(response.content)
+        
+        return {"filename": file.filename, "message": "PDF uploaded and downloaded successfully!", "file_url": file_url, "local_path": local_path}
     except NoCredentialsError:
         raise HTTPException(status_code=500, detail="AWS credentials not found")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
+@app.get("/get-latest-file-url")
+async def get_latest_file_url() -> Dict[str, str]:
+    """
+    Retrieve the most recently uploaded file's URL
+    """
+    if not uploaded_files:
+        raise HTTPException(status_code=404, detail="No files have been uploaded yet")
+    
+    latest_filename = list(uploaded_files.keys())[-1]
+    return {"filename": latest_filename, "file_url": uploaded_files[latest_filename]}

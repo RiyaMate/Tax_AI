@@ -5,6 +5,7 @@ import requests
 import boto3
 from dotenv import load_dotenv
 
+
 # Load environment variables
 load_dotenv()
 
@@ -101,12 +102,19 @@ if __name__ == "__main__":
     project_root = os.path.dirname(os.path.abspath(__file__))
     downloaded_pdf_path = os.path.join(project_root, "downloaded.pdf")
     output_dir = os.path.join(project_root, "output_data")
-    pdf_url = "https://arxiv.org/pdf/2408.09869"
     
     try:
-        print("Downloading PDF...")
-        download_pdf(pdf_url, downloaded_pdf_path)
-        print("Extracting data from PDF...")
-        extract_all_from_pdf(downloaded_pdf_path, output_dir)
+        print("Fetching latest uploaded PDF URL...")
+        response = requests.get("https://envbigdata-git-main-riyas-projects-bcd86dd8.vercel.app/get-latest-file-url")
+        response.raise_for_status()
+        pdf_url = response.json().get("file_url")
+        
+        if pdf_url:
+            print("Downloading PDF...")
+            download_pdf(pdf_url, downloaded_pdf_path)
+            print("Extracting data from PDF...")
+            extract_all_from_pdf(downloaded_pdf_path, output_dir)
+        else:
+            print("No PDF URL found.")
     except Exception as e:
         print(f"Error: {e}")
