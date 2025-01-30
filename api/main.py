@@ -5,6 +5,12 @@ import os
 import boto3
 from botocore.exceptions import NoCredentialsError
 
+
+from dotenv import load_dotenv
+import os
+
+# Load environment variables from .env file
+load_dotenv()
 # AWS S3 Configuration
 S3_BUCKET = os.getenv("S3_BUCKET")
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
@@ -30,6 +36,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+print("S3_BUCKET:", S3_BUCKET)
+print("AWS_ACCESS_KEY_ID:", AWS_ACCESS_KEY_ID)
+print("AWS_SECRET_ACCESS_KEY:", AWS_SECRET_ACCESS_KEY)
+print("AWS_REGION:", os.getenv("AWS_REGION", "us-east-1"))
+
 
 @app.get("/health")
 async def health_check() -> Dict[str, str]:
