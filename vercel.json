@@ -10,11 +10,5 @@
             "src": "/api/(.*)",
             "dest": "api/main.py"
         }
-    ],
-    "build": {
-        "env": {
-            "PIP_CACHE_DIR": ".vercel_cache/pip"
-        },
-        "buildCommand": "python -m venv venv && source venv/bin/activate && pip install --cache-dir .vercel_cache/pip -r requirements.txt"
-    }
+    ]
 }
