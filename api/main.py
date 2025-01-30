@@ -3,15 +3,22 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict
 import os
 import boto3
+import requests
 from botocore.exceptions import NoCredentialsError
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # AWS S3 Configuration
-S3_BUCKET = os.getenv("S3_BUCKET")
-AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
-AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+S3_BUCKET = os.getenv("AWS_BUCKET_NAME")
+AWS_ACCESS_KEY_ID = os.getenv("AWS_SERVER_PUBLIC_KEY")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SERVER_SECRET_KEY")
+AWS_REGION = "us-east-2" 
 
 s3_client = boto3.client(
     "s3",
+    region_name=AWS_REGION,
     aws_access_key_id=AWS_ACCESS_KEY_ID,
     aws_secret_access_key=AWS_SECRET_ACCESS_KEY
 )
@@ -30,13 +37,19 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-@app.get("/health")
-async def health_check() -> Dict[str, str]:
-    """
-    Health check endpoint to verify the service is running
-    """
-    return {"status": "healthy", "message": "Service is running! All good!!!"}
+@app.get("/debug-env")
+async def debug_env():
+    return {
+        "S3_BUCKET": S3_BUCKET,
+        "AWS_ACCESS_KEY_ID": AWS_ACCESS_KEY_ID,
+        "AWS_SECRET_ACCESS_KEY": "****" if AWS_SECRET_ACCESS_KEY else None
+    }
+# @app.get("/health")
+# async def health_check() -> Dict[str, str]:
+#     """
+#     Health check endpoint to verify the service is running
+#     """
+#     return {"status": "healthy", "message": "Service is running! All good!!!"}
 
 @app.get("/")
 async def root() -> Dict[str, str]:
@@ -75,13 +88,17 @@ async def upload_pdf(file: UploadFile = File(...)) -> Dict[str, str]:
         raise HTTPException(status_code=500, detail="S3_BUCKET environment variable is missing")
     
     try:
-        s3_client.upload_fileobj(file.file, S3_BUCKET, file.filename)
-        file_url = f"https://{S3_BUCKET}.s3.amazonaws.com/{file.filename}"
+        s3_client.upload_fileobj(file.file, S3_BUCKET, f"RawInputs/{file.filename}")
+        file_url = s3_client.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': S3_BUCKET, 'Key': f"RawInputs/{file.filename}"},
+            ExpiresIn=3600  # 1 hour validity
+        )
 
         # Store the file URL in a global dictionary
         uploaded_files[file.filename] = file_url
         
-        # Download the file locally after upload
+        # ✅ Fix: Import requests and use it to download the file
         local_path = os.path.join(os.getcwd(), file.filename)
         response = requests.get(file_url)
         response.raise_for_status()

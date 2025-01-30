@@ -1,20 +1,14 @@
-# Use Python 3.9 slim image as base with platform specification
-FROM --platform=linux/amd64 python:3.9-slim
+# Use an official Python runtime as a parent image
+FROM python:3.9
 
-# Set working directory
 WORKDIR /app
 
-# Copy requirements first for layer caching
-COPY requirements.txt .
+COPY . .
 
-# Install dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade pip setuptools wheel
+RUN pip install --no-cache-dir --upgrade --prefer-binary --use-deprecated=legacy-resolver -r requirements.txt
 
-# Copy the application code
-COPY ./api ./api
+EXPOSE 8080
 
-# Set environment variables
-ENV PORT=8080
-
-# Command to run the application
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8080"]
+# Auto-reload FastAPI and run Streamlit
+CMD ["sh", "-c", "uvicorn api.main:app --host 0.0.0.0 --port 8080 --reload & streamlit run frontend/app.py --server.port=8501 --server.address=0.0.0.0"]
