@@ -10,6 +10,12 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
+
+from dotenv import load_dotenv
+import os
+
+# Load environment variables from .env file
+load_dotenv()
 # AWS S3 Configuration
 S3_BUCKET = os.getenv("AWS_BUCKET_NAME")
 AWS_ACCESS_KEY_ID = os.getenv("AWS_SERVER_PUBLIC_KEY")
