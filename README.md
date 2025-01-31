@@ -1,6 +1,4 @@
-Certainly! Below is the updated `README.md` file with the workflow diagram image (`ai_application_workflow.png`) included. I've added a section to display the diagram and updated the **Workflow Diagram** section.
 
----
 
 # AI Application Workflow
 
