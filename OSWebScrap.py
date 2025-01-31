@@ -1,9 +1,31 @@
 from bs4 import BeautifulSoup
 import requests
 import os
+import boto3
+from io import BytesIO
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+
+# AWS Configuration
+AWS_SERVER_PUBLIC_KEY = "your-access-key"
+AWS_SECRET_KEY = "your-secret-key"
+AWS_BUCKET_NAME = "your-s3-bucket-name"
+AWS_REGION = "your-region"  # e.g., 'us-east-1'
+
+# Initialize S3 client
+s3_client = boto3.client(
+    's3',
+    aws_access_key_id=AWS_SERVER_PUBLIC_KEY,
+    aws_secret_access_key=AWS_SECRET_KEY,
+    region_name=AWS_REGION,
+)
 
 # List of disallowed file extensions
 DISALLOWED_EXTENSIONS = [".pdf", ".xls", ".xlsx", ".doc", ".docx", ".ppt", ".pptx", ".zip", ".rar"]
+
 
 def is_valid_url(url):
     """Check if the URL is valid and not pointing to a disallowed file type."""
@@ -17,75 +39,89 @@ def is_valid_url(url):
 
     return True
 
-def scrape_visual_data(url, output_dir):
-    """Scrape images, tables, and chart data from the specified webpage."""
-    response = requests.get(url)
-    response.raise_for_status()  # Ensure the request was successful
-    
-    soup = BeautifulSoup(response.text, 'html.parser')
-    
-    # Create output directory if it doesn't exist
-    os.makedirs(output_dir, exist_ok=True)
 
-    # Scrape and save images
-    img_tags = soup.find_all('img')
+def upload_to_s3(file_content, s3_path, content_type="text/plain"):
+    try:
+        s3_client.put_object(
+            Bucket=AWS_BUCKET_NAME,
+            Key=s3_path,
+            Body=file_content,
+            ContentType=content_type,
+        )
+        s3_url = f"https://{AWS_BUCKET_NAME}.s3.{AWS_REGION}.amazonaws.com/{s3_path}"
+        print(f"Uploaded to S3: {s3_url}")
+        return s3_url
+    except Exception as e:
+        print(f"Error uploading to S3: {e}")
+        return None
+
+
+def scrape_visual_data(url):
+    """Scrape images and tables from the specified webpage and upload to S3."""
+    response = requests.get(url)
+    response.raise_for_status()
+
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    # Scrape and upload images
+    img_tags = soup.find_all("img")
     images = []
     for idx, img_tag in enumerate(img_tags):
-        img_url = img_tag.get('src')
+        img_url = img_tag.get("src")
         if not img_url:
             continue
-        
-        # Resolve relative URLs
+
         img_url = requests.compat.urljoin(url, img_url)
 
         try:
             img_data = requests.get(img_url).content
-            img_filename = os.path.join(output_dir, f"image_{idx + 1}.jpg")
-            with open(img_filename, 'wb') as img_file:
-                img_file.write(img_data)
-            print(f"Saved image: {img_filename}")
-            images.append(img_filename)
+            s3_path = f"scraped_data/images/image_{idx + 1}.jpg"
+            upload_url = upload_to_s3(img_data, s3_path, "image/jpeg")
+            if upload_url:
+                images.append(upload_url)
         except Exception as e:
             print(f"Failed to download image {img_url}: {e}")
 
-    # Scrape and save tables
+    # Scrape and upload tables
     tables = []
-    table_filename = os.path.join(output_dir, "tables.txt")
-    with open(table_filename, 'w', encoding='utf-8') as table_file:
-        for table_idx, table in enumerate(soup.find_all('table'), start=1):
-            table_data = []
-            for row in table.find_all('tr'):
-                row_data = [cell.get_text(strip=True) for cell in row.find_all(['td', 'th'])]
-                table_data.append(row_data)
-            tables.append(table_data)
+    table_text = ""
+    for table_idx, table in enumerate(soup.find_all("table"), start=1):
+        table_data = []
+        for row in table.find_all("tr"):
+            row_data = [cell.get_text(strip=True) for cell in row.find_all(["td", "th"])]
+            table_data.append(row_data)
+        tables.append(table_data)
 
-            # Write tables to file
-            table_file.write(f"Table {table_idx}:\n")
-            for row in table_data:
-                table_file.write(" | ".join(row) + "\n")
-            table_file.write("\n")
+        # Convert table to string format
+        table_text += f"Table {table_idx}:\n"
+        for row in table_data:
+            table_text += " | ".join(row) + "\n"
+        table_text += "\n"
 
-    print(f"Saved tables to {table_filename}")
+    # Upload table data to S3
+    table_s3_path = "scraped_data/tables.txt"
+    upload_to_s3(table_text.encode("utf-8"), table_s3_path, "text/plain")
 
-    return {"images": images, "tables": tables}
+    return {"images": images, "tables": tables, "tables_s3_url": table_s3_path}
+
 
 def scrape_text_data_with_images(url):
-    """Extract visible text and image references from the specified webpage."""
+    """Extract visible text and image references from the webpage and store Markdown on S3."""
     response = requests.get(url)
-    response.raise_for_status()  # Ensure the request was successful
+    response.raise_for_status()
 
-    soup = BeautifulSoup(response.text, 'html.parser')
+    soup = BeautifulSoup(response.text, "html.parser")
 
     # Remove script and style elements
-    for script_or_style in soup(['script', 'style']):
+    for script_or_style in soup(["script", "style"]):
         script_or_style.extract()
 
     # Extract all image references and format them for Markdown
-    img_tags = soup.find_all('img')
+    img_tags = soup.find_all("img")
     image_markdown = []
     for idx, img_tag in enumerate(img_tags):
-        img_url = img_tag.get('src')
-        alt_text = img_tag.get('alt', f"Image {idx + 1}")  # Use 'alt' if available
+        img_url = img_tag.get("src")
+        alt_text = img_tag.get("alt", f"Image {idx + 1}")
         if img_url:
             img_url = requests.compat.urljoin(url, img_url)
             image_markdown.append(f"![{alt_text}]({img_url})")
@@ -96,35 +132,40 @@ def scrape_text_data_with_images(url):
     # Clean up and normalize whitespace
     lines = (line.strip() for line in text.splitlines())
     chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
-    cleaned_text = '\n'.join(chunk for chunk in chunks if chunk)
+    cleaned_text = "\n".join(chunk for chunk in chunks if chunk)
 
     # Append image references to the text content
     markdown_content = f"{cleaned_text}\n\n## Images\n\n" + "\n\n".join(image_markdown)
 
-    return markdown_content
+    # Upload to S3
+    markdown_s3_path = "scraped_data/scraped_content.md"
+    upload_to_s3(markdown_content.encode("utf-8"), markdown_s3_path, "text/markdown")
 
-def convert_to_markdown(data, output_file):
-    """Convert scraped data (text, images, tables) into Markdown format."""
+    return markdown_s3_path
+
+
+def convert_to_markdown(data):
+    """Convert scraped data into Markdown format and store on S3."""
     markdown_content = "# Extracted Web Content\n\n"
 
     # Add a section for images
     markdown_content += "## Images\n\n"
-    for idx, image in enumerate(data['images'], start=1):
-        relative_image_path = os.path.relpath(image)
-        markdown_content += f"![Image {idx}]({relative_image_path})\n\n"
+    for idx, image in enumerate(data["images"], start=1):
+        markdown_content += f"![Image {idx}]({image})\n\n"
 
     # Add a section for tables
     markdown_content += "## Tables\n\n"
-    for idx, table in enumerate(data['tables'], start=1):
+    for idx, table in enumerate(data["tables"], start=1):
         markdown_content += f"### Table {idx}\n\n"
         for row in table:
             markdown_content += "| " + " | ".join(row) + " |\n"
         markdown_content += "\n"
 
-    # Save the Markdown file
-    with open(output_file, "w", encoding="utf-8") as md_file:
-        md_file.write(markdown_content)
-    print(f"Markdown file saved: {output_file}")
+    # Upload Markdown to S3
+    markdown_s3_path = "scraped_data/final_scraped_content.md"
+    upload_to_s3(markdown_content.encode("utf-8"), markdown_s3_path, "text/markdown")
+    return markdown_s3_path
+
 
 if __name__ == "__main__":
     # Prompt user for a URL
@@ -134,19 +175,15 @@ if __name__ == "__main__":
         print("Exiting due to invalid URL.")
         exit(1)
 
-    output_directory = "./scraped_content"
+    # Scrape text data
+    markdown_s3_path = scrape_text_data_with_images(user_url)
 
-    # Scrape both visual and text data
-    text_data = scrape_text_data_with_images(user_url)
-    visual_data = scrape_visual_data(user_url, output_directory)
+    # Scrape visual data (images & tables)
+    visual_data = scrape_visual_data(user_url)
 
-    # Save the Markdown content
-    markdown_filename = os.path.join(output_directory, "scraped_content.md")
-    os.makedirs(output_directory, exist_ok=True)
-    
-    with open(markdown_filename, "w", encoding="utf-8") as f:
-        f.write(text_data)
-        print(f"Markdown file created: {markdown_filename}")
+    # Convert to final Markdown with images and tables
+    final_markdown_s3_path = convert_to_markdown(visual_data)
 
-    # Convert scraped content into Markdown
-    convert_to_markdown(visual_data, markdown_filename)
+    print(f"Scraped text Markdown uploaded: {markdown_s3_path}")
+    print(f"Final Markdown with images & tables uploaded: {final_markdown_s3_path}")
+
