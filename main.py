@@ -8,10 +8,13 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+AWS_REGION = "us-east-1"
+
 # AWS S3 Configuration
 session = boto3.Session(
     aws_access_key_id=os.getenv('AWS_SERVER_PUBLIC_KEY'),
     aws_secret_access_key=os.getenv('AWS_SERVER_SECRET_KEY'),
+    AWS_REGION=os.get
 )
 
 s3 = session.client('s3')
@@ -24,6 +27,7 @@ def upload_file_to_s3(file_path, object_name):
         print(f"Uploaded {file_path} to s3://{bucket_name}/{object_name}")
     except Exception as e:
         print(f"Error uploading file {file_path}: {e}")
+
 
 def download_pdf(url, output_path):
     """Download PDF from a URL and save to S3."""
