@@ -15,13 +15,16 @@ Below is the workflow diagram for the AI Application:
 2. **Streamlit App**: The frontend built using Streamlit.
 3. **FastAPI Backend**: The backend server that handles data processing.
 4. **Data Extraction**:
-   - **PyPDF2 / pdfplumber**: For extracting data from PDF files.
-   - **BeautifulSoup / Scrapy**: For web scraping.
-   - **Microsoft Document Intelligence**: For enterprise-level document processing.
+   - **PyMuPDF / camelot**: For extracting data from PDF files using Open Source tools.
+   - **Azure Document Intelligence and Adobe API Extract API**: For extracting data from PDF files using Enterprise tools.
+   - **BeautifulSoup**: For web scraping using Open Source Tools.
+   - **APIFY**: For web scraping using Enterprise Tools.
 5. **Standardization Tools**:
-   - **Docling**: A custom tool for standardizing extracted data.
+   - **Docling**: A custom tool for standardizing conversions from pdfs to markdowns.
    - **MarkItDown**: Another custom tool for further data standardization.
 6. **AWS S3 Bucket**: Used for storing processed data.
+7. **Google Cloud Run**: Used for Deploying FastAPI applications
+8. **Streamlit In-builtDeployment**: Used for Deploying Streamlit application for UI/UX. 
 
 ---
 
@@ -32,7 +35,7 @@ Below is the workflow diagram for the AI Application:
 3. **FastAPI Backend**: A backend server built using FastAPI to handle data processing and communication with other services.
 4. **Data Extraction**:
    - **PyPDF2 / pdfplumber**: For extracting data from PDF files.
-   - **BeautifulSoup / Scrapy**: For web scraping.
+   - **BeautifulSoup/Scrapy**: For web scraping.
    - **Microsoft Document Intelligence**: For enterprise-level document processing.
 5. **Standardization Tools**:
    - **Docling**: A custom tool for standardizing extracted data.
@@ -63,20 +66,31 @@ Below is the workflow diagram for the AI Application:
 - Streamlit and FastAPI installed for frontend and backend development.
 
 ---
-
 ## Installation
 
-1. Clone the repository:
+Clone the repository:
+
    ```bash
    git clone https://github.com/yourusername/ai-application-workflow.git
    cd ai-application-workflow
    ```
+   Create a .env file and add the required credentials:
 
-2. Install the required Python packages:
    ```bash
-   pip install -r requirements.txt
+   AWS_ACCESS_KEY_ID=your_aws_access_key
+   AWS_SECRET_ACCESS_KEY=your_aws_secret_key
+   AZURE_DOCUMENT_INTELLIGENCE_KEY=your_azure_key
+   APIFY_TOKEN=your_apify_token
+   ADOBE_API_KEY=your_adobe_api_key
    ```
-
+   
+   Build and run the application using Docker Compose:
+   ```bash
+   docker-compose build --no-cache
+   docker-compose up -d
+   ```
+   
+   
 3. Ensure you have the custom icons (`microsoft.png`, `docling.png`, `markitdown.png`, `streamlit.png`) in the `./icons/` directory.
 
 4. Generate the workflow diagram:
