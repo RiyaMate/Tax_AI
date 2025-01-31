@@ -1,5 +1,18 @@
 # Use an official Python runtime as a parent image
-FROM python:3.9
+FROM python:3.9-slim
+
+# Install system dependencies required for Camelot & OpenCV
+RUN apt-get update && apt-get install -y \
+    ghostscript \
+    poppler-utils \
+    python3-tk \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
+    libgl1-mesa-glx \
+    libgl1-mesa-dri \
+    && apt-get clean
 
 WORKDIR /app
 

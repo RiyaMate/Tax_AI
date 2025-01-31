@@ -30,3 +30,4 @@ python
 .DS_Store
 Thumbs.db
 *.pdf
+output/
