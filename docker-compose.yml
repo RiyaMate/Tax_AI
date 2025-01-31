@@ -1,11 +1,15 @@
+version: '3.8'
+
 services:
-  app:
-    build: .  # Build from the current directory (make sure your Dockerfile is here)
-    container_name: fastapi_streamlit_app
+  fastapi:
+    build:
+      context: .  # Use the current directory
+      dockerfile: Dockerfile
+    image: gcr.io/bigdatateam5/fastapi-app  # Set the correct image name
+    container_name: fastapi_service
     ports:
-      - "8080:8080"  # FastAPI API endpoint
-      - "8501:8501"  # Streamlit app
+      - "8080:8080"
     env_file: 
-      - .env  # Load environment variables if needed
+      - .env  # Load environment variables
     volumes:
-      - .:/app  # Mount the current directory to /app in the container
+      - .:/app  # Mount the local directory

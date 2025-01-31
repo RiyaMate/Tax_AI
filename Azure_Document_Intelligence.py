@@ -148,6 +148,6 @@ def extract_and_upload_pdf(pdf_path):
     print("\n✅✅✅ Extraction & Upload Completed Successfully! ✅✅✅")
 
 
-# Example Usage:
-pdf_path = "africas_manufacturing_puzzle-compressed.pdf"  # Replace with actual PDF path
-extract_and_upload_pdf(pdf_path)
+# # Example Usage:
+# pdf_path = "africas_manufacturing_puzzle-compressed.pdf"  # Replace with actual PDF path
+# extract_and_upload_pdf(pdf_path)

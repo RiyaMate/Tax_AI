@@ -26,11 +26,12 @@ def upload_file_to_s3(file_path, object_name):
 # Constants
 IMAGE_RESOLUTION_SCALE = 2.0
 
-def main():
+def main(pdf_path):
     logging.basicConfig(level=logging.INFO)
 
-    input_doc_path = Path("downloaded.pdf")
-    output_dir = Path("output")
+    input_doc_path = Path(pdf_path)
+    output_dir = Path(f"output/{Path(pdf_path).stem}")
+
 
     # Configure pipeline options
     pipeline_options = PdfPipelineOptions()
@@ -94,6 +95,3 @@ def main():
 
     logging.info(f"Document converted and figures exported in {end_time:.2f} seconds.")
 
-
-if __name__ == "__main__":
-    main()
