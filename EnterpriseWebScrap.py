@@ -7,19 +7,18 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# AWS Configuration
-AWS_KEY = os.getenv('AWS_SERVER_PUBLIC_KEY')
-AWS_SECRET_KEY = os.getenv('AWS_SERVER_SECRET_KEY')
-AWS_BUCKET_NAME = os.getenv('AWS_BUCKET_NAME')
-AWS_REGION = os.getenv('AWS_REGION')
 
 # Initialize S3 client
-s3_client = boto3.client(
+session = boto3.Session(
     's3',
-    aws_access_key_id=AWS_KEY,
-    aws_secret_access_key=AWS_SECRET_KEY,
-    region_name=AWS_REGION,
+    aws_access_key_id=os.getenv('AWS_SERVER_PUBLIC_KEY'),
+    aws_secret_access_key=os.getenv('AWS_SERVER_SECRET_KEY'),
+    
 )
+
+s3 = session.client('s3')
+bucket_name = os.getenv('AWS_BUCKET_NAME')
+aws_region = os.getenv('AWS_REGION')
 
 # Replace with your Apify API token
 APIFY_TOKEN = os.getenv('APIFY_TOKEN')
@@ -45,8 +44,8 @@ def is_valid_url(url):
 # Function to upload files to S3
 def upload_to_s3(file_path, s3_key):
     try:
-        s3_client.upload_file(file_path, AWS_BUCKET_NAME, s3_key)
-        s3_url = f"https://{AWS_BUCKET_NAME}.s3.{AWS_REGION}.amazonaws.com/{s3_key}"
+        s3.upload_file(file_path, bucket_name, s3_key)
+        s3_url = f"https://{bucket_name}.s3.{aws_region}.amazonaws.com/{s3_key}"
         print(f"Uploaded to S3: {s3_url}")
         return s3_url
     except Exception as e:

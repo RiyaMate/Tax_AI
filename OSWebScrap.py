@@ -9,19 +9,18 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-# AWS Configuration
-AWS_SERVER_PUBLIC_KEY = "your-access-key"
-AWS_SECRET_KEY = "your-secret-key"
-AWS_BUCKET_NAME = "your-s3-bucket-name"
-AWS_REGION = "your-region"  # e.g., 'us-east-1'
 
 # Initialize S3 client
-s3_client = boto3.client(
+session = boto3.Session(
     's3',
-    aws_access_key_id=AWS_SERVER_PUBLIC_KEY,
-    aws_secret_access_key=AWS_SECRET_KEY,
-    region_name=AWS_REGION,
+    aws_access_key_id=os.getenv('AWS_SERVER_PUBLIC_KEY'),
+    aws_secret_access_key=os.getenv('AWS_SERVER_SECRET_KEY'),
+    
 )
+
+s3 = session.client('s3')
+bucket_name = os.getenv('AWS_BUCKET_NAME')
+aws_region = os.getenv('AWS_REGION')
 
 # List of disallowed file extensions
 DISALLOWED_EXTENSIONS = [".pdf", ".xls", ".xlsx", ".doc", ".docx", ".ppt", ".pptx", ".zip", ".rar"]
@@ -42,13 +41,13 @@ def is_valid_url(url):
 
 def upload_to_s3(file_content, s3_path, content_type="text/plain"):
     try:
-        s3_client.put_object(
-            Bucket=AWS_BUCKET_NAME,
+        s3.put_object(
+            Bucket=bucket_name,
             Key=s3_path,
             Body=file_content,
             ContentType=content_type,
         )
-        s3_url = f"https://{AWS_BUCKET_NAME}.s3.{AWS_REGION}.amazonaws.com/{s3_path}"
+        s3_url = f"https://{bucket_name}.s3.{aws_region}.amazonaws.com/{s3_path}"
         print(f"Uploaded to S3: {s3_url}")
         return s3_url
     except Exception as e:
