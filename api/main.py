@@ -13,15 +13,15 @@ import time
 from Azure_Document_Intelligence import extract_and_upload_pdf
 from EnterpriseWebScrap import is_valid_url, save_and_upload_images, generate_and_upload_markdown
 from OSWebScrap import scrape_text_data_with_images, scrape_visual_data, convert_to_markdown
+from open_source_parsing import extract_all_from_pdf
+from docklingextraction import main
 
 
-# ✅ Add the root directory to the Python path
+# Add the root directory to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-# ✅ Now import the parsing functions
-from open_source_parsing import extract_all_from_pdf
-# ✅ Call the Docling conversion function
-from docklingextraction import main
+#  Now import the parsing functions
+#  Call the Docling conversion function
 # Load environment variables from .env file
 load_dotenv()
 
@@ -89,18 +89,18 @@ async def upload_pdf(file: UploadFile = File(...)) -> Dict[str, str]:
         raise HTTPException(status_code=500, detail="S3_BUCKET environment variable is missing")
     
     try:
-        # ✅ Upload file directly to S3 (No Local Storage)
+        # Upload file directly to S3 (No Local Storage)
         s3_key = f"RawInputs/{file.filename}"
         s3_client.upload_fileobj(file.file, S3_BUCKET, s3_key)
 
-        # ✅ Generate pre-signed URL
+        # Generate pre-signed URL
         file_url = s3_client.generate_presigned_url(
             'get_object',
             Params={'Bucket': S3_BUCKET, 'Key': s3_key},
             ExpiresIn=3600  # 1 hour validity
         )
 
-        # ✅ Save the file details globally
+        # Save the file details globally
         global latest_file_details
         latest_file_details = {
             "filename": file.filename,
@@ -238,23 +238,23 @@ async def fetch_markdowns_from_s3():
     Fetch all Markdown files from the S3 markdown outputs folder and save them locally.
     """
     try:
-        # ✅ Define S3 folder path where markdowns are stored
+        # Define S3 folder path where markdowns are stored
         s3_folder = "pdf_processing_pipeline/pdf_os_pipeline/markdown_outputs/"
         
-        # ✅ Check if the S3 folder exists
+        #  Check if the S3 folder exists
         response = s3_client.list_objects_v2(Bucket=S3_BUCKET, Prefix=s3_folder)
         if response["KeyCount"] == 0:
             raise HTTPException(status_code=404, detail="Markdown folder not found in S3.")
 
-        # ✅ Check if any markdown files exist
+        #  Check if any markdown files exist
         if "Contents" not in response:
             raise HTTPException(status_code=404, detail="No markdown files found in S3.")
 
-        # ✅ Ensure the local directory for markdown files exists
+        # Ensure the local directory for markdown files exists
         local_markdown_dir = "markdown_outputs"
         os.makedirs(local_markdown_dir, exist_ok=True)
 
-        # ✅ Download only Markdown files
+        # Download only Markdown files
         downloaded_files = []
         for obj in response["Contents"]:
             file_key = obj["Key"]
@@ -351,30 +351,30 @@ async def fetch_WebScrapMarkdowns_from_s3():
     Fetch all Markdown files from the S3 markdown outputs folder and save them locally.
     """
     try:
-        # ✅ Define S3 folder path where markdowns are stored
+        # Define S3 folder path where markdowns are stored
         s3_folder = "scraped_data/scraped_content.md"
        
-        # ✅ Check if the S3 folder exists
+        #  Check if the S3 folder exists
         response = s3_client.list_objects_v2(Bucket=S3_BUCKET, Prefix=s3_folder)
         if response["KeyCount"] == 0:
             raise HTTPException(status_code=404, detail="Markdown not found in S3.")
  
-        # ✅ Check if any markdown files exist
+        #  Check if any markdown files exist
         if "Contents" not in response:
             raise HTTPException(status_code=404, detail="No markdown files found in S3.")
  
-        # ✅ Ensure the local directory for markdown files exists
+        #  Ensure the local directory for markdown files exists
         local_markdown_dir = "markdown_outputs"
         os.makedirs(local_markdown_dir, exist_ok=True)
  
-        # ✅ Download only Markdown files
+        #  Download only Markdown files
         downloaded_files = []
         for obj in response["Contents"]:
             file_key = obj["Key"]
-            if file_key.endswith(".md"):  # ✅ Only process Markdown files
+            if file_key.endswith(".md"):  #  Only process Markdown files
                 local_file_path = os.path.join(local_markdown_dir, os.path.basename(file_key))
                
-                # ✅ Download the file from S3
+                #  Download the file from S3
                 s3_client.download_file(S3_BUCKET, file_key, local_file_path)
                 downloaded_files.append(local_file_path)
  

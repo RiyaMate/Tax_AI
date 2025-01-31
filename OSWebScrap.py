@@ -11,16 +11,14 @@ load_dotenv()
 
 
 # Initialize S3 client
-session = boto3.Session(
-    's3',
-    aws_access_key_id=os.getenv('AWS_SERVER_PUBLIC_KEY'),
-    aws_secret_access_key=os.getenv('AWS_SERVER_SECRET_KEY'),
-    
-)
 
+
+session = boto3.Session()
 s3 = session.client('s3')
 bucket_name = os.getenv('AWS_BUCKET_NAME')
-aws_region = os.getenv('AWS_REGION')
+region_name="us-east-2"
+
+
 
 # List of disallowed file extensions
 DISALLOWED_EXTENSIONS = [".pdf", ".xls", ".xlsx", ".doc", ".docx", ".ppt", ".pptx", ".zip", ".rar"]

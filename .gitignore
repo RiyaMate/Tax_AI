@@ -30,4 +30,7 @@ python
 .DS_Store
 Thumbs.db
 *.pdf
+*.png
+*.jpg
+*.jpeg
 output/
