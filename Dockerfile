@@ -14,15 +14,27 @@ RUN apt-get update && apt-get install -y \
     libgl1-mesa-dri \
     && apt-get clean
 
+# Set the working directory for the app
 WORKDIR /app
 
-COPY . .
+# Copy the backend (API) code
+COPY ./api ./api
 
-# Install dependencies
+# Copy the frontend code
+COPY ./frontend ./frontend
+
+# Install backend (API) dependencies
+WORKDIR /app/api
 RUN pip install --upgrade pip setuptools wheel
 RUN pip install --no-cache-dir --upgrade --prefer-binary --use-deprecated=legacy-resolver -r requirements.txt
 
+# Install frontend dependencies
+WORKDIR /app/frontend
+RUN pip install --no-cache-dir --upgrade --prefer-binary --use-deprecated=legacy-resolver -r requirements.txt
+
+# Expose the default port for FastAPI
 EXPOSE 8080
 
 # Start FastAPI with auto-reload for development
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8080", "--reload"]
+WORKDIR /app/api
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]

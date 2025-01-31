@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from azure.core.credentials import AzureKeyCredential
 from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.ai.documentintelligence.models import AnalyzeResult
+from fastapi import HTTPException
 
 def extract_and_upload_pdf(pdf_path):
     """Extracts text, images, tables, and metadata from a PDF and uploads them directly to S3."""
@@ -29,27 +30,6 @@ def extract_and_upload_pdf(pdf_path):
     endpoint = os.getenv("AZURE_FORM_RECOGNIZER_ENDPOINT")
     key = os.getenv("AZURE_FORM_RECOGNIZER_KEY")
 
-    # Set file size and page constraints
-    MAX_FILE_SIZE_MB = 5  # Max allowed file size in MB
-    MAX_PAGE_COUNT = 5  # Max allowed pages
-
-    # Get file size
-    pdf_size_mb = os.path.getsize(pdf_path) / (1024 * 1024)  # Convert bytes to MB
-
-    # Get page count
-    with fitz.open(pdf_path) as pdf_doc:
-        pdf_page_count = len(pdf_doc)
-
-    # Check file constraints
-    if pdf_size_mb > MAX_FILE_SIZE_MB:
-        print(f"❌ File too large: {pdf_size_mb:.2f}MB (Limit: {MAX_FILE_SIZE_MB}MB). Process stopped.")
-        return
-
-    if pdf_page_count > MAX_PAGE_COUNT:
-        print(f"❌ Too many pages: {pdf_page_count} pages (Limit: {MAX_PAGE_COUNT} pages). Process stopped.")
-        return
-
-    print(f"✅ PDF meets size ({pdf_size_mb:.2f}MB) and page count ({pdf_page_count} pages) limits. Proceeding with extraction...")
 
     # Initialize Azure Document Intelligence Client
     document_intelligence_client = DocumentIntelligenceClient(endpoint=endpoint, credential=AzureKeyCredential(key))
