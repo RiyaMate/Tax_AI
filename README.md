@@ -102,15 +102,7 @@ Below is the workflow diagram for the AI Application:
 
 ---
 
-## Custom Icons
 
-Place your custom icons in the `./icons/` directory. The following icons are required:
-- `microsoft.png`
-- `docling.png`
-- `markitdown.png`
-- `streamlit.png`
-
----
 
 ## Contributing
 
