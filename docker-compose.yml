@@ -1,0 +1,11 @@
+services:
+  app:
+    build: .  # Build from the current directory (make sure your Dockerfile is here)
+    container_name: fastapi_streamlit_app
+    ports:
+      - "8080:8080"  # FastAPI API endpoint
+      - "8501:8501"  # Streamlit app
+    env_file: 
+      - .env  # Load environment variables if needed
+    volumes:
+      - .:/app  # Mount the current directory to /app in the container
