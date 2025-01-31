@@ -25,3 +25,5 @@ boto3
 
 llama-index
 docling
+
+apify_client
