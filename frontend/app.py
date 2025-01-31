@@ -1,6 +1,5 @@
 import streamlit as st
 import requests
-<<<<<<< HEAD
 import time
 
 # FastAPI Base URL (Update this with the correct deployed FastAPI URL)
@@ -206,7 +205,6 @@ if st.session_state.markdown_ready:
 
 elif selected == "Settings":
     st.subheader("⚙️ Modify your application settings here.")
-=======
  
 # FastAPI Endpoint
 FASTAPI_URL =  "http://127.0.0.1:8000/"
@@ -272,4 +270,3 @@ def main():
  
 if __name__ == "__main__":
     main()
->>>>>>> 12e8e4b5ba02709cb6dbfc3f1623b384c6542ba0
