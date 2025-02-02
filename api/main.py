@@ -407,8 +407,7 @@ async def fetch_latest_markdown_downloads():
             download_url = s3_client.generate_presigned_url(
                 "get_object",
                 Params={"Bucket": S3_BUCKET, "Key": file_key},
-                ExpiresIn=3600 ,
-                Config=boto3.session.Config(signature_version="s3v4") # 1-hour expiration
+                ExpiresIn=3600 
             )
 
             # ✅ Option 2: Use direct public URL (if ACL is `public-read`)
