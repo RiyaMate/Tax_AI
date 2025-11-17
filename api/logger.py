@@ -48,7 +48,7 @@ def setup_logger(name, log_file, level=logging.INFO):
 # Create different loggers for different components
 api_logger = setup_logger('api', logs_dir / 'api.log')
 pdf_logger = setup_logger('pdf_processing', logs_dir / 'pdf_processing.log')
-s3_logger = setup_logger('s3', logs_dir / 's3_operations.log')
+gcs_logger = setup_logger('gcs', logs_dir / 'gcs_operations.log')
 error_logger = setup_logger('errors', logs_dir / 'errors.log', level=logging.ERROR)
 
 # Create a request logger to track all API requests

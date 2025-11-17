@@ -3,3 +3,8 @@ requests>=2.31.0
 matplotlib
 pandas
 numpy
+landingai-ade>=0.1.0
+python-dotenv
+beautifulsoup4>=4.11.0
+google-generativeai>=0.3.0
+openai>=1.0.0

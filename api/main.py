@@ -6,13 +6,15 @@ import gc
 from pydantic import BaseModel
 import os
 import sys
-import boto3
+from google.cloud import storage
 import fitz
 import requests
 import uuid
-from botocore.exceptions import NoCredentialsError
 from dotenv import load_dotenv
+load_dotenv(override=True)
+print("GEMINI_API_KEY loaded in main.py:", os.getenv("GEMINI_API_KEY"))
 from fastapi import Query
+from datetime import datetime
 MAX_FILE_SIZE_MB = 5  # Max allowed file size in MB
 MAX_PAGE_COUNT = 5  # Max allowed pages
 import time
@@ -29,27 +31,29 @@ sys.path.append(root_dir)
 api_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(api_dir)
 
-from api.docklingextraction import main
-from logger import api_logger, pdf_logger, s3_logger, error_logger, request_logger, log_request, log_error
+# Import docling extraction with graceful fallback for scipy/sklearn conflicts
+try:
+    from docklingextraction import main as docling_main
+    DOCLING_AVAILABLE = True
+except Exception as e:
+    print(f"[WARNING] Docling extraction unavailable: {e}")
+    print("[INFO] Continuing without docling support (using LandingAI only)")
+    DOCLING_AVAILABLE = False
+    docling_main = None
+
+from logger import api_logger, pdf_logger, gcs_logger, error_logger, request_logger, log_request, log_error
 from llm_extractor.litellm_query_generator import MODEL_CONFIGS
 import threading
 from worker import main as worker_main
 # Load environment variables from .env file
 load_dotenv(override=True)
+print("[DEBUG] VISION_AGENT_API_KEY at startup:", os.getenv("VISION_AGENT_API_KEY"))
 
-# AWS S3 Configuration
-S3_BUCKET = os.getenv("AWS_BUCKET_NAME")
-AWS_ACCESS_KEY_ID = os.getenv("AWS_SERVER_PUBLIC_KEY")
-AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SERVER_SECRET_KEY")
-AWS_REGION = os.getenv("AWS_REGION")
-
-
-s3_client = boto3.client(
-    "s3",
-    region_name=AWS_REGION,
-    aws_access_key_id=AWS_ACCESS_KEY_ID,
-    aws_secret_access_key=AWS_SECRET_ACCESS_KEY
-)
+# Google Cloud Storage Configuration
+GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID")
+GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME")
+gcs_client = storage.Client(project=GCP_PROJECT_ID)
+gcs_bucket = gcs_client.bucket(GCS_BUCKET_NAME)
 
 # Redis Configuration
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
@@ -162,16 +166,16 @@ def check_pdf_constraints(pdf_path):
             pdf_page_count = len(pdf_doc)
 
         if pdf_size_mb > MAX_FILE_SIZE_MB:
-            error_message = f"❌ File too large: {pdf_size_mb:.2f}MB (Limit: {MAX_FILE_SIZE_MB}MB). Process stopped."
+            error_message = f"[FAIL] File too large: {pdf_size_mb:.2f}MB (Limit: {MAX_FILE_SIZE_MB}MB). Process stopped."
             pdf_logger.warning(error_message)
             return {"error": error_message}  # Return error instead of raising
 
         if pdf_page_count > MAX_PAGE_COUNT:
-            error_message = f"❌ Too many pages: {pdf_page_count} pages (Limit: {MAX_PAGE_COUNT} pages). Process stopped."
+            error_message = f"[FAIL] Too many pages: {pdf_page_count} pages (Limit: {MAX_PAGE_COUNT} pages). Process stopped."
             pdf_logger.warning(error_message)
             return {"error": error_message}  # Return error instead of raising
 
-        pdf_logger.info(f"✅ PDF meets size ({pdf_size_mb:.2f}MB) and page count ({pdf_page_count} pages) limits. Proceeding with upload...")
+        pdf_logger.info(f"[YES] PDF meets size ({pdf_size_mb:.2f}MB) and page count ({pdf_page_count} pages) limits. Proceeding with upload...")
         return {"success": True}
 
     except Exception as e:
@@ -189,6 +193,65 @@ async def root() -> Dict[str, str]:
         "version": "1.0.0",
         "documentation": "/docs"
     }
+
+@app.get("/debug/gcs-contents")
+async def debug_gcs_contents():
+    """
+    Debug endpoint to list all contents in GCS bucket
+    """
+    try:
+        api_logger.info(f"Listing all objects in bucket: {GCS_BUCKET_NAME}")
+        
+        all_blobs = list(gcs_client.list_blobs(GCS_BUCKET_NAME))
+        api_logger.info(f"Total objects in bucket: {len(all_blobs)}")
+        
+        # Group by prefix
+        items = {
+            "total_count": len(all_blobs),
+            "prefixes": {},
+            "sample_files": []
+        }
+        
+        for blob in all_blobs[:20]:  # Show first 20
+            prefix = blob.name.split("/")[0] if "/" in blob.name else "root"
+            if prefix not in items["prefixes"]:
+                items["prefixes"][prefix] = 0
+            items["prefixes"][prefix] += 1
+            items["sample_files"].append({
+                "name": blob.name,
+                "size": blob.size,
+                "updated": blob.updated.isoformat() if blob.updated else None
+            })
+        
+        return items
+    except Exception as e:
+        return {"error": str(e), "error_type": type(e).__name__}
+
+@app.get("/debug/markdown-outputs")
+async def debug_markdown_outputs():
+    """
+    Debug endpoint to specifically check markdown_outputs folder
+    """
+    try:
+        gcs_base_folder = "pdf_processing_pipeline/markdown_outputs/"
+        api_logger.info(f"Listing objects in: {gcs_base_folder}")
+        
+        # List with delimiter to see folder structure
+        blobs_iterator = gcs_client.list_blobs(GCS_BUCKET_NAME, prefix=gcs_base_folder, delimiter='/')
+        blobs_list = list(blobs_iterator)
+        prefixes = list(blobs_iterator.prefixes) if hasattr(blobs_iterator, 'prefixes') else []
+        
+        api_logger.info(f"Blobs found: {len(blobs_list)}, Prefixes: {len(prefixes)}")
+        
+        return {
+            "base_folder": gcs_base_folder,
+            "blobs_count": len(blobs_list),
+            "prefixes_count": len(prefixes),
+            "prefixes": prefixes,
+            "blobs": [{"name": b.name, "size": b.size} for b in blobs_list[:10]]
+        }
+    except Exception as e:
+        return {"error": str(e), "error_type": type(e).__name__}
 # Start the worker process on application startup
 @app.on_event("startup")
 async def startup_event():
@@ -236,7 +299,7 @@ async def start_result_listener():
     asyncio.create_task(listen_for_results())
 
 
-# ✅ Favicon Route
+# [YES] Favicon Route
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
     return FileResponse("static/favicon.ico")
@@ -244,7 +307,7 @@ async def favicon():
 @app.post("/upload-pdf")
 async def upload_pdf(file: UploadFile = File(...), service_type: str = Query("")) -> Dict[str, str]:
     """
-    Uploads a PDF file to AWS S3 after checking constraints.
+    Uploads a PDF file to Google Cloud Storage after checking constraints.
     """
     pdf_logger.info(f"PDF upload requested : {file.filename},Service type: {file.content_type}")
     if file.content_type != "application/pdf":
@@ -255,9 +318,9 @@ async def upload_pdf(file: UploadFile = File(...), service_type: str = Query("")
         pdf_logger.warning("Upload attempted with no filename")
         raise HTTPException(status_code=400, detail="Uploaded file has no name")
 
-    if not S3_BUCKET:
-        log_error("S3_BUCKET environment variable is missing")
-        raise HTTPException(status_code=500, detail="S3_BUCKET environment variable is missing")
+    if not GCS_BUCKET_NAME:
+        log_error("GCS_BUCKET_NAME environment variable is missing")
+        raise HTTPException(status_code=500, detail="GCS_BUCKET_NAME environment variable is missing")
     
     temp_pdf_path = None  # Define temp path for cleanup
 
@@ -277,31 +340,27 @@ async def upload_pdf(file: UploadFile = File(...), service_type: str = Query("")
                 os.remove(temp_pdf_path)  # Cleanup temp file
                 raise HTTPException(status_code=400, detail=constraint_check["error"])
 
-        # Upload file to S3 (only if constraints are met)
-        s3_key = f"RawInputs/{file.filename}"
-        s3_logger.info(f"Uploading PDF to S3: {s3_key}")
-        s3_client.upload_file(temp_pdf_path, S3_BUCKET, s3_key)
-        s3_logger.info(f"PDF successfully uploaded to S3: s3://{S3_BUCKET}/{s3_key}")
+        # Upload file to GCS (only if constraints are met)
+        gcs_key = f"RawInputs/{file.filename}"
+        gcs_logger.info(f"Uploading PDF to GCS: {gcs_key}")
+        blob = gcs_bucket.blob(gcs_key)
+        blob.upload_from_filename(temp_pdf_path)
+        gcs_logger.info(f"PDF successfully uploaded to GCS: gs://{GCS_BUCKET_NAME}/{gcs_key}")
 
-        s3_logger.debug(f"Generated pre-signed URL for {s3_key}")
+        gcs_logger.debug(f"Generated blob reference for {gcs_key}")
         # Cleanup: Delete the temp file after successful upload
         os.remove(temp_pdf_path)
         pdf_logger.debug(f"Temporary PDF file deleted: {temp_pdf_path}")
         # Save the file details globally
         new_file_details = {
             "filename": file.filename,
-            "s3_key": s3_key,
+            "gcs_key": gcs_key,
             "upload_time": str(time.time())
         }
         latest_file_details.append(new_file_details)
         pdf_logger.info(f"File details saved for {file.filename}")
-        return {"filename": file.filename, "message": "✅ PDF uploaded successfully!"}
+        return {"filename": file.filename, "message": "[YES] PDF uploaded successfully!"}
 
-    except NoCredentialsError:
-        if temp_pdf_path and os.path.exists(temp_pdf_path):
-            os.remove(temp_pdf_path)  # Cleanup on error
-        log_error("AWS credentials not found")
-        raise HTTPException(status_code=500, detail="AWS credentials not found")
     except HTTPException as e:
         if temp_pdf_path and os.path.exists(temp_pdf_path):
             os.remove(temp_pdf_path)  # Cleanup on error
@@ -310,13 +369,14 @@ async def upload_pdf(file: UploadFile = File(...), service_type: str = Query("")
         if temp_pdf_path and os.path.exists(temp_pdf_path):
             os.remove(temp_pdf_path)  # Cleanup on error
         log_error(f"PDF upload failed for {file.filename}", e)
-        raise HTTPException(status_code=500, detail=f"❌ Upload failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"[FAIL] Upload failed: {str(e)}")
         
 @app.get("/get-latest-file-url")
 async def get_latest_file_url() -> Dict[str, Any]:
     """
     Retrieve the most recently uploaded file's URL, download it locally, and save the details.
     """
+    from datetime import timedelta
     api_logger.info("Fetching latest file URL")
     if not latest_file_details:
         api_logger.warning("No files have been uploaded yet")
@@ -325,26 +385,23 @@ async def get_latest_file_url() -> Dict[str, Any]:
     current_file = latest_file_details[-1]
     api_logger.info(f"Latest file: {current_file['filename']}")
     
-    # Get the S3 key from stored details
-    s3_key = current_file["s3_key"]
+    # Get the GCS key from stored details
+    gcs_key = current_file["gcs_key"]
     
     try:
-        # Generate a fresh pre-signed URL (the stored one might have expired)
-        fresh_file_url = s3_client.generate_presigned_url(
-            'get_object',
-            Params={'Bucket': S3_BUCKET, 'Key': s3_key},
-            ExpiresIn=3600  # 1 hour validity
-        )
+        # Generate a signed URL for the blob (works with private buckets)
+        blob = gcs_bucket.blob(gcs_key)
+        fresh_file_url = blob.generate_signed_url(version="v4", expiration=timedelta(hours=1))
         
         # Update the URL in our stored details
         current_file["file_url"] = fresh_file_url
-        s3_logger.info(f"Generated fresh pre-signed URL for {s3_key}")
+        gcs_logger.info(f"Generated signed URL for {gcs_key}")
         
         # Define local download path
         project_root = os.getcwd()
         downloaded_pdf_path = os.path.join(project_root, current_file["filename"])
 
-        # Download the file using the fresh URL
+        # Download the file using the signed URL
         pdf_logger.info(f"Downloading file from: {fresh_file_url}")
         response = requests.get(fresh_file_url)
         response.raise_for_status()
@@ -369,6 +426,7 @@ async def get_latest_file_url() -> Dict[str, Any]:
 
 @app.post("/convert-pdf-to-markdown")
 async def convert_pdf_to_markdown(file: UploadFile = File(...)):
+    pdf_logger.info(f"Starting PDF to Markdown conversion for: {file.filename}")
     # Create a temporary file path
     temp_dir = tempfile.mkdtemp()
     try:
@@ -379,10 +437,14 @@ async def convert_pdf_to_markdown(file: UploadFile = File(...)):
             while chunk := await file.read(1024 * 1024):  # Read 1MB chunks
                 pdf_file.write(chunk)
         
+        pdf_logger.info(f"PDF written to temp file: {temp_pdf_path}")
+        
         # Process PDF page by page instead of all at once
         markdown_content = ""
         with fitz.open(temp_pdf_path) as pdf:
-            for page_num in range(len(pdf)):
+            page_count = len(pdf)
+            pdf_logger.info(f"PDF has {page_count} pages")
+            for page_num in range(page_count):
                 page = pdf[page_num]
                 text = page.get_text()
                 # Process text to markdown
@@ -392,72 +454,109 @@ async def convert_pdf_to_markdown(file: UploadFile = File(...)):
                 page = None
                 gc.collect()
         
+        pdf_logger.info(f"Markdown conversion completed. Content length: {len(markdown_content)}")
+        
+        # Save markdown to GCS in the proper folder structure
+        if GCS_BUCKET_NAME:
+            try:
+                from datetime import datetime, timedelta
+                
+                # Create a job-specific folder with timestamp
+                job_id = str(uuid.uuid4())[:8]
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                job_folder = f"pdf_processing_pipeline/markdown_outputs/{job_id}_{timestamp}/"
+                
+                # Create two versions: standard markdown and with-images version
+                base_filename = file.filename.replace(".pdf", "")
+                
+                # Standard markdown file
+                standard_md_key = f"{job_folder}{base_filename}.md"
+                blob_standard = gcs_bucket.blob(standard_md_key)
+                blob_standard.upload_from_string(markdown_content, content_type="text/markdown")
+                gcs_logger.info(f"Standard markdown saved to GCS: {standard_md_key}")
+                
+                # With-images version (for consistency with other endpoints)
+                with_images_md_key = f"{job_folder}{base_filename}-with-images.md"
+                blob_with_images = gcs_bucket.blob(with_images_md_key)
+                blob_with_images.upload_from_string(markdown_content, content_type="text/markdown")
+                gcs_logger.info(f"Markdown with-images version saved to GCS: {with_images_md_key}")
+                
+                # Generate signed URLs for both versions
+                standard_url = blob_standard.generate_signed_url(version="v4", expiration=timedelta(hours=1))
+                with_images_url = blob_with_images.generate_signed_url(version="v4", expiration=timedelta(hours=1))
+                
+                gcs_logger.info(f"Successfully created markdown files in folder: {job_folder}")
+                
+                return {
+                    "markdown": markdown_content,
+                    "gcs_locations": {
+                        "standard": standard_md_key,
+                        "with_images": with_images_md_key
+                    },
+                    "signed_urls": {
+                        "standard": standard_url,
+                        "with_images": with_images_url
+                    },
+                    "job_id": job_id,
+                    "message": "[YES] Markdown conversion completed and saved to GCS"
+                }
+            except Exception as e:
+                gcs_logger.error(f"Failed to save markdown to GCS: {str(e)}", exc_info=True)
+                pdf_logger.error(f"GCS save failed: {str(e)}")
+                # Still return the markdown content even if GCS save fails
+                return {
+                    "markdown": markdown_content,
+                    "warning": f"Markdown converted but GCS save failed: {str(e)}"
+                }
+        
         return {"markdown": markdown_content}
     finally:
         # Clean up temporary files
         shutil.rmtree(temp_dir, ignore_errors=True)
+        pdf_logger.info(f"Cleaned up temp directory: {temp_dir}")
 
 @app.get("/fetch-latest-markdown-urls")
-async def fetch_latest_markdown_from_s3():
+async def fetch_latest_markdown_from_gcs():
     """
-    Fetch Markdown file URLs from the latest job-specific subfolder in S3.
+    Fetch Markdown file URLs from the latest job-specific subfolder in GCS.
     """
-    api_logger.info("Fetching latest markdown URLs from S3")
+    from datetime import timedelta
+    api_logger.info("Fetching latest markdown URLs from GCS")
     try:
         # Base folder where markdowns are stored
-        s3_base_folder = "pdf_processing_pipeline/markdown_outputs/"
-        s3_logger.info(f"Checking S3 folder: {s3_base_folder}")
+        gcs_base_folder = "pdf_processing_pipeline/markdown_outputs/"
+        gcs_logger.info(f"Checking GCS folder: {gcs_base_folder}")
 
-        # Fetch all objects under markdown_outputs
-        response = s3_client.list_objects_v2(Bucket=S3_BUCKET, Prefix=s3_base_folder, Delimiter='/')
+        # List ALL markdown files (without delimiter)
+        all_markdown_blobs = list(gcs_client.list_blobs(GCS_BUCKET_NAME, prefix=gcs_base_folder))
+        gcs_logger.info(f"Found {len(all_markdown_blobs)} total markdown files in GCS")
 
-        if "CommonPrefixes" not in response:
-            api_logger.warning("No markdown folders found in S3")
-            raise HTTPException(status_code=404, detail="No markdown folders found in S3.")
+        if not all_markdown_blobs:
+            api_logger.info("No markdown folders found in GCS - returning empty result")
+            return {
+                "message": "No markdown files have been generated yet. Upload and process a PDF first.",
+                "latest_folder": None,
+                "markdown_files": []
+            }
 
-        # Extract all job-specific subfolders
-        subfolders = [prefix["Prefix"] for prefix in response["CommonPrefixes"]]
-        s3_logger.info(f"Found {len(subfolders)} markdown subfolders in S3")
+        # Find the latest file by modification time
+        latest_blob = max(all_markdown_blobs, key=lambda b: b.updated if b.updated else b.time_created)
+        latest_folder = "/".join(latest_blob.name.split("/")[:-1]) + "/"
 
-        if not subfolders:
-            api_logger.warning("No markdown subfolders found in S3")
-            raise HTTPException(status_code=404, detail="No markdown subfolders found in S3.")
-
-        # Fetch last modified markdown file inside each subfolder
-        latest_folder = None
-        latest_time = None
-
-        for folder in subfolders:
-            # List files inside each subfolder
-            folder_response = s3_client.list_objects_v2(Bucket=S3_BUCKET, Prefix=folder)
-
-            if "Contents" not in folder_response:
-                continue
-
-            # Get the latest modified file inside the folder
-            for obj in folder_response["Contents"]:
-                if obj["Key"].endswith(".md"):
-                    last_modified = obj["LastModified"]
-
-                    if latest_time is None or last_modified > latest_time:
-                        latest_folder = folder
-                        latest_time = last_modified
-
-        if latest_folder is None:
-            api_logger.warning("No markdown files found in any subfolder")
-            raise HTTPException(status_code=404, detail="No markdown files found in subfolders.")
-
-        s3_logger.info(f"Latest folder identified: {latest_folder}")
+        gcs_logger.info(f"Latest folder identified: {latest_folder}")
 
         # Fetch all markdown files inside the latest folder
-        latest_folder_response = s3_client.list_objects_v2(Bucket=S3_BUCKET, Prefix=latest_folder)
-        markdown_urls = [
-            f"https://{S3_BUCKET}.s3.amazonaws.com/{obj['Key']}"
-            for obj in latest_folder_response["Contents"]
-            if obj["Key"].endswith(".md")
+        latest_blobs = [
+            blob for blob in all_markdown_blobs 
+            if blob.name.startswith(latest_folder) and blob.name.endswith(".md")
         ]
         
-        s3_logger.info(f"Found {len(markdown_urls)} markdown files in the latest folder")
+        markdown_urls = []
+        for blob in latest_blobs:
+            signed_url = blob.generate_signed_url(version="v4", expiration=timedelta(hours=1))
+            markdown_urls.append(signed_url)
+        
+        gcs_logger.info(f"Found {len(markdown_urls)} markdown files in the latest folder")
 
         return {
             "message": f"Fetched Markdown files from the latest subfolder: {latest_folder}",
@@ -466,89 +565,68 @@ async def fetch_latest_markdown_from_s3():
         }
 
     except Exception as e:
-        log_error("Failed to fetch markdown URLs from S3", e)
+        log_error("Failed to fetch markdown URLs from GCS", e)
         raise HTTPException(status_code=500, detail=f"Failed to fetch markdown files: {str(e)}")
 
 @app.get("/fetch-latest-markdown-downloads")
 async def fetch_latest_markdown_downloads():
     """
-    Fetch Markdown file download links from the latest job-specific folder in S3.
+    Fetch Markdown file download links from the latest job-specific folder in GCS.
     """
-    api_logger.info("Fetching latest markdown URLs from S3")
+    from datetime import timedelta
+    api_logger.info("Fetching latest markdown downloads from GCS")
 
     try:
-        # Base S3 folder where markdowns are stored
-        s3_base_folder = "pdf_processing_pipeline/markdown_outputs/"
-        s3_logger.info(f"Checking S3 folder: {s3_base_folder}")
+        # Base GCS folder where markdowns are stored
+        gcs_base_folder = "pdf_processing_pipeline/markdown_outputs/"
+        gcs_logger.info(f"Checking GCS folder: {gcs_base_folder}")
 
+        # List ALL markdown files (without delimiter to get actual files)
+        all_markdown_blobs = list(gcs_client.list_blobs(GCS_BUCKET_NAME, prefix=gcs_base_folder))
+        gcs_logger.info(f"Found {len(all_markdown_blobs)} total markdown files in GCS")
+        
+        if not all_markdown_blobs:
+            api_logger.info("No markdown files found in GCS - returning empty result")
+            return {
+                "message": "No markdown files have been generated yet. Upload and process a PDF first.",
+                "latest_folder": None,
+                "markdown_downloads": []
+            }
 
-        # Fetch all job subfolders
-        response = s3_client.list_objects_v2(Bucket=S3_BUCKET, Prefix=s3_base_folder, Delimiter='/')
+        # Find the latest file by modification time
+        latest_blob = max(all_markdown_blobs, key=lambda b: b.updated if b.updated else b.time_created)
+        latest_folder = "/".join(latest_blob.name.split("/")[:-1]) + "/"
+        
+        gcs_logger.info(f"Latest folder identified: {latest_folder}")
 
-        if "CommonPrefixes" not in response:
-            api_logger.warning("No markdown folders found in S3")
-            raise HTTPException(status_code=404, detail="No markdown folders found in S3.")
-
-        # Extract all subfolders
-        subfolders = [prefix["Prefix"] for prefix in response["CommonPrefixes"]]
-        s3_logger.info(f"Found {len(subfolders)} markdown subfolders in S3")
-
-        if not subfolders:
-            api_logger.warning("No markdown folders found in S3")
-            raise HTTPException(status_code=404, detail="No markdown subfolders found in S3.")
-
-        # Find the latest folder based on the most recently modified file
-        latest_folder = None
-        latest_time = None
-
-        for folder in subfolders:
-            folder_response = s3_client.list_objects_v2(Bucket=S3_BUCKET, Prefix=folder)
-            s3_logger.info(f"Checking folder: {folder}")
-
-            if "Contents" not in folder_response:
-                s3_logger.info(f"No markdown files found in folder: {folder}")
-                continue
-
-            # Check the latest file modification time inside each subfolder
-            for obj in folder_response["Contents"]:
-                if obj["Key"].endswith(".md"):
-                    last_modified = obj["LastModified"]
-                    s3_logger.info(f"Found markdown file: {obj['Key']} - Last modified: {last_modified}")
-
-                    if latest_time is None or last_modified > latest_time:
-                        latest_folder = folder
-                        latest_time = last_modified
-                        s3_logger.info(f"Latest folder updated: {latest_folder}")
-
-        if latest_folder is None:
-            api_logger.warning("No markdown folders found in S3")
-            raise HTTPException(status_code=404, detail="No markdown files found in subfolders.")
-
-        # ✅ List all Markdown files inside the latest folder
-        latest_folder_response = s3_client.list_objects_v2(Bucket=S3_BUCKET, Prefix=latest_folder)
-        markdown_files = [
-            obj["Key"] for obj in latest_folder_response["Contents"] if obj["Key"].endswith(".md")
+        # Get all markdown files from the latest folder
+        latest_folder_blobs = [
+            blob for blob in all_markdown_blobs 
+            if blob.name.startswith(latest_folder) and blob.name.endswith(".md")
         ]
+        
+        gcs_logger.info(f"Found {len(latest_folder_blobs)} markdown files in latest folder: {latest_folder}")
+        
+        if not latest_folder_blobs:
+            api_logger.info("No markdown files found in the latest folder - returning empty result")
+            return {
+                "message": "No markdown files in the latest folder. Upload and process a PDF first.",
+                "latest_folder": latest_folder,
+                "markdown_downloads": []
+            }
 
-        if not markdown_files:
-            api_logger.warning("No markdown files found in the latest folder")
-            raise HTTPException(status_code=404, detail="No markdown files available for download.")
-
-        # ✅ Generate public or pre-signed download URLs for the markdown files
+        # [YES] Generate signed download URLs for the markdown files
         markdown_download_links = []
-        for file_key in markdown_files:
-            s3_logger.info(f"Generating download link for: {file_key}")
-            # ✅ Option 1: Use pre-signed URL for private files (recommended for security)
-            download_url = s3_client.generate_presigned_url(
-                "get_object",
-                Params={"Bucket": S3_BUCKET, "Key": file_key},
-                ExpiresIn=3600 
-            )
+        for blob in latest_folder_blobs:
+            gcs_logger.info(f"Generating download link for: {blob.name}")
+            # [YES] Use GCS signed URL (v4) for private files
+            download_url = blob.generate_signed_url(version="v4", expiration=timedelta(hours=1))
             markdown_download_links.append({
-                "file_name": file_key.split("/")[-1],
+                "file_name": blob.name.split("/")[-1],
+                "file_key": blob.name,
                 "download_url": download_url
             })
-            s3_logger.info(f"Download link generated for: {file_key}")
+            gcs_logger.info(f"Download link generated for: {blob.name}")
 
         return {
             "message": f"Fetched Markdown downloads from the latest subfolder: {latest_folder}",
@@ -557,75 +635,75 @@ async def fetch_latest_markdown_downloads():
         }
 
     except Exception as e:
+        log_error("Failed to fetch markdown downloads from GCS", e)
+        gcs_logger.error(f"DEBUG: Exception details: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to fetch markdown downloads: {str(e)}")
     
 @app.get("/list-image-ref-markdowns")
 async def list_image_ref_markdowns():
     """
-    Fetch all Markdown files with 'image-ref' suffix from all subfolders in S3 and generate download links.
+    Fetch all Markdown files with 'image-ref' suffix from all subfolders in GCS and generate download links.
     """
-    api_logger.info("Fetching image-ref markdown files from all folders in S3")
+    from datetime import timedelta
+    api_logger.info("Fetching image-ref markdown files from all folders in GCS")
 
     try:
-        # Base S3 folder where markdowns are stored
-        s3_base_folder = "pdf_processing_pipeline/markdown_outputs/"
-        s3_logger.info(f"Checking S3 base folder: {s3_base_folder}")
+        # Base GCS folder where markdowns are stored
+        gcs_base_folder = "pdf_processing_pipeline/markdown_outputs/"
+        gcs_logger.info(f"Checking GCS base folder: {gcs_base_folder}")
 
         # Fetch all job subfolders
-        response = s3_client.list_objects_v2(Bucket=S3_BUCKET, Prefix=s3_base_folder, Delimiter='/')
-
-        if "CommonPrefixes" not in response:
-            api_logger.warning("No markdown folders found in S3")
-            raise HTTPException(status_code=404, detail="No markdown folders found in S3.")
-
-        # Extract all subfolders
-        subfolders = [prefix["Prefix"] for prefix in response["CommonPrefixes"]]
-        s3_logger.info(f"Found {len(subfolders)} markdown subfolders in S3")
+        blobs = gcs_client.list_blobs(GCS_BUCKET_NAME, prefix=gcs_base_folder, delimiter='/')
+        subfolders = list(blobs.prefixes)
+        gcs_logger.info(f"Found {len(subfolders)} markdown subfolders in GCS")
 
         if not subfolders:
-            api_logger.warning("No markdown folders found in S3")
-            raise HTTPException(status_code=404, detail="No markdown subfolders found in S3.")
+            api_logger.info("No markdown folders found in GCS - returning empty result")
+            return {
+                "message": "No markdown files have been generated yet. Upload and process a PDF first.",
+                "file_count": 0,
+                "folder_count": 0,
+                "image_ref_markdowns": []
+            }
 
         # Collect all image-ref markdown files from all folders
         image_md_files = []
 
         for folder in subfolders:
-            s3_logger.info(f"Searching for image-ref markdowns in folder: {folder}")
-            folder_response = s3_client.list_objects_v2(Bucket=S3_BUCKET, Prefix=folder)
-            
-            if "Contents" not in folder_response:
-                s3_logger.info(f"No files found in folder: {folder}")
-                continue
+            gcs_logger.info(f"Searching for image-ref markdowns in folder: {folder}")
+            folder_blobs = gcs_client.list_blobs(GCS_BUCKET_NAME, prefix=folder)
             
             # Filter for markdown files with image-ref in their name
-            for obj in folder_response["Contents"]:
-                file_key = obj["Key"]
-                file_name = file_key.split("/")[-1]
+            for blob in folder_blobs:
+                file_name = blob.name
+                file_basename = file_name.split("/")[-1]
                 
-                if file_key.endswith(".md") and "-with-images." in file_name:
-                    s3_logger.info(f"Found markdown with images: {file_key}")
+                if file_name.endswith(".md") and "-with-images." in file_basename:
+                    gcs_logger.info(f"Found markdown with images: {file_name}")
                     
-                    # Generate pre-signed URL for the file
-                    download_url = s3_client.generate_presigned_url(
-                        "get_object",
-                        Params={"Bucket": S3_BUCKET, "Key": file_key},
-                        ExpiresIn=3600  # 1 hour validity
-                    )
+                    # Generate signed URL for the file
+                    signed_blob = gcs_bucket.blob(file_name)
+                    download_url = signed_blob.generate_signed_url(version="v4", expiration=timedelta(hours=1))
                     
                     # Add to our collection
                     image_md_files.append({
                         "folder": folder,
-                        "file_name": file_name,
-                        "file_key": file_key,
+                        "file_name": file_basename,
+                        "file_key": file_name,
                         "download_url": download_url,
-                        "last_modified": obj["LastModified"].isoformat()
+                        "last_modified": blob.updated.isoformat()
                     })
                     
-                    s3_logger.info(f"Generated download link for: {file_key}")
+                    gcs_logger.info(f"Generated download link for: {file_name}")
 
         if not image_md_files:
-            api_logger.warning("No image-ref markdown files found in any folder")
-            raise HTTPException(status_code=404, detail="No image-ref markdown files found.")
+            api_logger.info("No image-ref markdown files found in any folder - returning empty result")
+            return {
+                "message": "No image-ref markdown files found yet. Process a PDF with image extraction.",
+                "file_count": 0,
+                "folder_count": len(subfolders),
+                "image_ref_markdowns": []
+            }
 
         # Sort by last modified date (newest first)
         image_md_files.sort(key=lambda x: x["last_modified"], reverse=True)
@@ -638,7 +716,7 @@ async def list_image_ref_markdowns():
         }
 
     except Exception as e:
-        log_error("Failed to fetch image-ref markdown files", e)
+        log_error("Failed to fetch image-ref markdown files from GCS", e)
         raise HTTPException(status_code=500, detail=f"Failed to fetch image-ref markdown files: {str(e)}")
 # llm endpoints starts here
 def start_worker_process():
@@ -837,3 +915,344 @@ async def check_llm_health():
             "status": "unhealthy",
             "error": str(e)
         }
+
+# ==================== TAX DOCUMENT PROCESSING ====================
+
+# Import tax modules with graceful fallback for scipy/sklearn conflicts
+try:
+    from tax_document_parser import TaxDocumentParser
+    from tax_calculation_engine import TaxCalculationEngine, FilingStatus
+    from form_1040_generator import Form1040Generator
+    TAX_MODULES_AVAILABLE = True
+except Exception as e:
+    print(f"[WARNING] Tax modules unavailable: {e}")
+    print("[INFO] Tax document processing will use frontend-only approach")
+    TAX_MODULES_AVAILABLE = False
+    TaxDocumentParser = None
+    TaxCalculationEngine = None
+    FilingStatus = None
+    Form1040Generator = None
+
+from fastapi.responses import StreamingResponse
+
+class PersonalInfo(BaseModel):
+    first_name: str
+    last_name: str
+    ssn: str
+    email: str
+    filing_status: str
+    tax_year: int
+    dependents: Optional[List[Dict[str, str]]] = []
+
+@app.post("/tax/upload")
+async def upload_tax_documents(
+    files: List[UploadFile] = File(...),
+    first_name: str = "",
+    last_name: str = "",
+    ssn: str = "",
+    email: str = "",
+    filing_status: str = "",
+    tax_year: int = 2024,
+    background_tasks: BackgroundTasks = None
+):
+    """
+    Upload and process tax documents (W-2, 1099-NEC, 1099-INT).
+    Extracts structured data from tax forms.
+    """
+    api_logger.info(f"Tax document upload initiated. Files: {len(files)}, User: {first_name} {last_name}")
+    
+    temp_dir = None
+    results = []
+    validation_issues = []
+    
+    try:
+        # Create temporary directory for processing
+        temp_dir = tempfile.mkdtemp(prefix="tax_docs_")
+        api_logger.info(f"Created temp directory: {temp_dir}")
+        
+        # Initialize parser
+        parser = TaxDocumentParser()
+        
+        # Process each uploaded file
+        for file in files:
+            # Validate file
+            if not file.filename.lower().endswith('.pdf'):
+                results.append({
+                    "filename": file.filename,
+                    "status": "error",
+                    "error": "Only PDF files are supported"
+                })
+                continue
+            
+            # Check file size (5MB max)
+            file_content = await file.read()
+            file_size_mb = len(file_content) / (1024 * 1024)
+            
+            if file_size_mb > 5:
+                results.append({
+                    "filename": file.filename,
+                    "status": "error",
+                    "error": f"File size {file_size_mb:.2f}MB exceeds 5MB limit"
+                })
+                continue
+            
+            # Save file to temp directory
+            file_path = os.path.join(temp_dir, file.filename)
+            with open(file_path, "wb") as f:
+                f.write(file_content)
+            
+            # Parse the document
+            parse_result = parser.parse(file_path)
+            parse_result["filename"] = file.filename
+            
+            # Add validation issues
+            if parse_result.get("validation_issues"):
+                validation_issues.extend(parse_result["validation_issues"])
+            
+            results.append(parse_result)
+            api_logger.info(f"Processed file: {file.filename} - Type: {parse_result.get('document_type')}")
+        
+        # Calculate summary
+        successful = sum(1 for r in results if r.get("status") == "success")
+        failed = sum(1 for r in results if r.get("status") == "error")
+        
+        response = {
+            "status": "success",
+            "user": {
+                "first_name": first_name,
+                "last_name": last_name,
+                "email": email,
+                "filing_status": filing_status,
+                "tax_year": tax_year
+            },
+            "summary": {
+                "total_documents": len(files),
+                "successful_documents": successful,
+                "failed_documents": failed
+            },
+            "documents": results,
+            "validation_issues": validation_issues,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        # Save results to GCS if configured
+        if GCS_BUCKET_NAME:
+            try:
+                result_key = f"tax_documents/{tax_year}/{first_name}_{last_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+                blob = gcs_bucket.blob(result_key)
+                blob.upload_from_string(json.dumps(response), content_type="application/json")
+                response["gcs_location"] = result_key
+                gcs_logger.info(f"Results saved to GCS: {result_key}")
+            except Exception as e:
+                gcs_logger.error(f"Failed to save results to GCS: {str(e)}")
+        
+        # Clean up temp directory in background
+        if background_tasks:
+            background_tasks.add_task(cleanup_temp_directory, temp_dir)
+        
+        return response
+    
+    except Exception as e:
+        api_logger.error(f"Tax document upload failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
+    
+    finally:
+        # Cleanup if no background task
+        if temp_dir and not background_tasks:
+            cleanup_temp_directory(temp_dir)
+
+def cleanup_temp_directory(path: str):
+    """Clean up temporary directory"""
+    try:
+        shutil.rmtree(path)
+        api_logger.info(f"Cleaned up temp directory: {path}")
+    except Exception as e:
+        api_logger.error(f"Failed to cleanup temp directory {path}: {str(e)}")
+
+@app.get("/tax/status/{upload_id}")
+async def get_tax_document_status(upload_id: str):
+    """
+    Check the status of a tax document upload.
+    Returns the extracted data and processing status.
+    """
+    try:
+        if not redis_client:
+            raise HTTPException(status_code=503, detail="Redis service unavailable")
+        
+        result = redis_client.get(f"tax_upload:{upload_id}")
+        if not result:
+            raise HTTPException(status_code=404, detail="Upload not found")
+        
+        return json.loads(result)
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        api_logger.error(f"Failed to get tax upload status: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/tax/calculate")
+async def calculate_tax(
+    upload_id: Optional[str] = None,
+    filing_status: str = "Single",
+    dependent_count: int = 0,
+    w2_wages: float = 0.0,
+    nec_income: float = 0.0,
+    interest_income: float = 0.0,
+    other_income: float = 0.0,
+    federal_withheld_w2: float = 0.0,
+    federal_withheld_1099: float = 0.0,
+):
+    """
+    Calculate federal income tax liability based on extracted document data.
+    Returns comprehensive tax calculation and refund/amount owed.
+    """
+    try:
+        api_logger.info(f"Tax calculation initiated - Status: {filing_status}, Dependents: {dependent_count}")
+        
+        # Initialize calculation engine
+        calc_engine = TaxCalculationEngine()
+        
+        # Prepare tax data
+        tax_data = {
+            "filing_status": filing_status,
+            "dependent_count": dependent_count,
+            "w2_wages": w2_wages,
+            "nec_income": nec_income,
+            "interest_income": interest_income,
+            "other_income": other_income,
+            "federal_withheld_w2": federal_withheld_w2,
+            "federal_withheld_1099": federal_withheld_1099,
+        }
+        
+        # Calculate tax
+        result = calc_engine.process_tax_return(tax_data)
+        
+        if result.get("status") == "calculated":
+            # Store in cache if Redis available
+            if redis_client:
+                calculation_id = str(uuid.uuid4())
+                redis_client.setex(
+                    f"tax_calculation:{calculation_id}",
+                    3600,  # 1 hour expiry
+                    json.dumps(result)
+                )
+                result["calculation_id"] = calculation_id
+        
+        return result
+    
+    except Exception as e:
+        api_logger.error(f"Tax calculation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/tax/generate-form-1040")
+async def generate_form_1040(
+    first_name: str,
+    last_name: str,
+    ssn: str,
+    filing_status: str,
+    tax_year: int = 2024,
+    dependent_count: int = 0,
+    w2_wages: float = 0.0,
+    nec_income: float = 0.0,
+    interest_income: float = 0.0,
+    other_income: float = 0.0,
+    federal_withheld_w2: float = 0.0,
+    federal_withheld_1099: float = 0.0,
+):
+    """
+    Generate a completed Form 1040 PDF based on tax data.
+    """
+    try:
+        api_logger.info(f"Form 1040 generation initiated for {first_name} {last_name}")
+        api_logger.info(f"Tax data: filing_status={filing_status}, w2_wages={w2_wages}, nec_income={nec_income}, int_income={interest_income}")
+        
+        # Calculate tax
+        calc_engine = TaxCalculationEngine()
+        tax_data = {
+            "filing_status": filing_status,
+            "dependent_count": dependent_count,
+            "w2_wages": w2_wages,
+            "nec_income": nec_income,
+            "interest_income": interest_income,
+            "other_income": other_income,
+            "federal_withheld_w2": federal_withheld_w2,
+            "federal_withheld_1099": federal_withheld_1099,
+        }
+        
+        try:
+            tax_calculation = calc_engine.process_tax_return(tax_data)
+            api_logger.info(f"Tax calculation completed. Status: {tax_calculation.get('status')}")
+        except Exception as calc_error:
+            api_logger.error(f"Tax calculation error: {str(calc_error)}", exc_info=True)
+            raise HTTPException(status_code=400, detail=f"Tax calculation failed: {str(calc_error)}")
+        
+        if tax_calculation.get("status") != "calculated":
+            api_logger.error(f"Tax calculation status invalid: {tax_calculation.get('status')}")
+            raise HTTPException(status_code=400, detail="Tax calculation failed")
+        
+        # Prepare taxpayer info
+        taxpayer_info = {
+            "first_name": first_name,
+            "last_name": last_name,
+            "ssn": ssn,
+            "filing_status": filing_status,
+            "tax_year": tax_year,
+            "dependent_count": dependent_count,
+        }
+        
+        # Generate Form 1040
+        try:
+            form_generator = Form1040Generator()
+            pdf_buffer = form_generator.generate_form(taxpayer_info, tax_calculation)
+            api_logger.info(f"Form 1040 generated successfully for {first_name} {last_name}")
+        except Exception as form_error:
+            api_logger.error(f"Form 1040 generation error: {str(form_error)}", exc_info=True)
+            raise HTTPException(status_code=400, detail=f"Form generation failed: {str(form_error)}")
+        
+        # Save to GCS if configured
+        if GCS_BUCKET_NAME:
+            try:
+                form_key = f"forms/1040/{tax_year}/{first_name}_{last_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+                blob = gcs_bucket.blob(form_key)
+                blob.upload_from_string(pdf_buffer.getvalue(), content_type="application/pdf")
+                gcs_logger.info(f"Form 1040 saved to GCS: {form_key}")
+            except Exception as e:
+                gcs_logger.error(f"Failed to save Form 1040 to GCS: {str(e)}")
+        
+        return StreamingResponse(
+            iter([pdf_buffer.getvalue()]),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename=Form1040_{first_name}_{last_name}_{tax_year}.pdf"}
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        api_logger.error(f"Form 1040 generation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/tax/summary")
+async def get_tax_summary():
+    """
+    Get summary statistics for all processed tax returns (if using Redis cache).
+    """
+    try:
+        if not redis_client:
+            raise HTTPException(status_code=503, detail="Redis service unavailable")
+        
+        # Get all calculation IDs
+        keys = redis_client.keys("tax_calculation:*")
+        total_calculations = len(keys)
+        
+        return {
+            "status": "success",
+            "total_tax_calculations": total_calculations,
+            "timestamp": datetime.now().isoformat()
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        api_logger.error(f"Failed to get tax summary: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))

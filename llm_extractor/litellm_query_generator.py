@@ -6,6 +6,8 @@ from pathlib import Path
 import litellm
 from dotenv import load_dotenv
 import time
+import json
+import requests
 
 # Function to force reload environment variables
 def reload_env_variables():
@@ -16,6 +18,7 @@ def reload_env_variables():
     if os.path.exists(env_path):
         load_dotenv(env_path, override=True)
         print("Environment loaded successfully")
+        print(f"Loaded GEMINI_API_KEY: {os.getenv('GEMINI_API_KEY')}")
     else:
         print("No .env file found, continuing with defaults")
 reload_env_variables()
@@ -26,15 +29,49 @@ litellm.deepseek_api_key = os.getenv("DEEPSEEK_API_KEY")
 litellm.openai_api_key = os.getenv("OPENAI_API_KEY")
 litellm.xai_api_key = os.getenv("GROK_API_KEY")
 
+# Force Gemini to use Google AI API instead of Vertex AI
+os.environ["GOOGLE_API_KEY"] = os.getenv("GEMINI_API_KEY", "")
+
+# Disable Vertex AI by removing GCP service account credentials temporarily
+# This prevents LiteLLM from trying to use Vertex AI for Gemini requests
+_original_gcp_creds = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+if _original_gcp_creds:
+    # We'll restore this later, but remove it for Gemini calls
+    pass
+
 # Debug output to check API keys
 print(f"API Keys Status:")
-print(f"- Gemini:    {'✓' if litellm.gemini_key else '✗'}")
-print(f"- Anthropic: {'✓' if litellm.anthropic_api_key else '✗'}")
-print(f"- DeepSeek:  {'✓' if litellm.deepseek_api_key else '✗'}")
-print(f"- OpenAI:    {'✓' if litellm.openai_api_key else '✗'}")
-print(f"- Grok:      {'✓' if litellm.xai_api_key else '✗'}")
+print(f"- Gemini:    {'YES' if litellm.gemini_key else 'NO'}")
+print(f"- Anthropic: {'YES' if litellm.anthropic_api_key else 'NO'}")
+print(f"- DeepSeek:  {'YES' if litellm.deepseek_api_key else 'NO'}")
+print(f"- OpenAI:    {'YES' if litellm.openai_api_key else 'NO'}")
+print(f"- Grok:      {'YES' if litellm.xai_api_key else 'NO'}")
 # Model configurations
 MODEL_CONFIGS = {
+                "gemini-2.5-flash-preview-09-2025": {
+                    "name": "Gemini 2.5 Flash Preview",
+                    "model": "gemini-2.5-flash-preview-09-2025",
+                    "max_input_tokens": 1000000,
+                    "max_output_tokens": 8000,
+                    "supports_images": True,
+                    "provider": "google"
+                },
+            "gemini-pro": {
+                "name": "Gemini Pro",
+                "model": "gemini-pro",
+                "max_input_tokens": 1000000,
+                "max_output_tokens": 8000,
+                "supports_images": True,
+                "provider": "google"
+            },
+        "gemini-1.5-flash": {
+            "name": "Gemini 1.5 Flash",
+            "model": "gemini-1.5-flash",
+            "max_input_tokens": 1000000,
+            "max_output_tokens": 8000,
+            "supports_images": True,
+            "provider": "google"
+        },
     "gpt4o": {
         "name": "GPT-4o",
         "model": "openai/gpt-4o",
@@ -43,11 +80,12 @@ MODEL_CONFIGS = {
         "supports_images": True,
     },
     "gemini": {
-        "name": "Gemini Flash",
-        "model": "gemini/gemini-1.5-flash",
-        "max_input_tokens": 100000,
-        "max_output_tokens": 4000,
+        "name": "Gemini 2.5 Flash Preview",
+        "model": "gemini-2.5-flash-preview-09-2025",
+        "max_input_tokens": 1000000,
+        "max_output_tokens": 8000,
         "supports_images": True,
+        "provider": "google"
     },
     "deepseek": {
         "name": "DeepSeek",
@@ -182,7 +220,7 @@ def create_llm_response_from_markdown(
         model_name = model_config["model"]
         api_key_status = False
         
-        if model_id == "gemini" and litellm.gemini_key:
+        if model_id.startswith("gemini") and litellm.gemini_key:
             api_key_status = True
         elif model_id == "gpt4o" and litellm.openai_api_key:
             api_key_status = True
@@ -271,7 +309,15 @@ def create_llm_response_from_markdown(
                     ]
         
         # Call model using LiteLLM with specific configurations per model
-        if model_id == "claude":
+        if model_id == "gpt4o":
+            response = litellm.completion(
+                model=model_config["model"],
+                messages=messages,
+                temperature=0.3,
+                max_tokens=model_config["max_output_tokens"],
+                api_key=litellm.openai_api_key
+            )
+        elif model_id == "claude":
             response = litellm.completion(
                 model=model_config["model"],  
                 messages=messages,
@@ -279,14 +325,61 @@ def create_llm_response_from_markdown(
                 max_tokens=model_config["max_output_tokens"],
                 api_key= litellm.anthropic_api_key
             )
-        elif model_id == "gemini":
-            response = litellm.completion(
-                model=model_config["model"], 
-                messages=messages,
-                temperature=0.3,
-                max_tokens=model_config["max_output_tokens"],
-                api_key= litellm.gemini_key
-            )
+        elif model_id.startswith("gemini"):
+            # Use direct REST API call to bypass LiteLLM's Vertex AI routing
+            gemini_api_key = os.getenv("GEMINI_API_KEY")
+            print(f"[DEBUG] Gemini API key used for REST call: {gemini_api_key}")
+            if not gemini_api_key:
+                raise ValueError("GEMINI_API_KEY not found in environment")
+            # Convert messages to Gemini format
+            gemini_messages = []
+            for msg in messages:
+                if msg["role"] == "user":
+                    gemini_messages.append({
+                        "role": "user",
+                        "parts": [{"text": msg["content"]} if isinstance(msg["content"], str) else msg["content"]]
+                    })
+                elif msg["role"] == "assistant":
+                    gemini_messages.append({
+                        "role": "model",
+                        "parts": [{"text": msg["content"]} if isinstance(msg["content"], str) else msg["content"]]
+                    })
+            # Call Gemini API directly using v1beta endpoint
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key={gemini_api_key}"
+            print(f"[DEBUG] Gemini API request URL: {url}")
+            payload = {
+                "contents": gemini_messages,
+                "generationConfig": {
+                    "temperature": 0.3,
+                    "maxOutputTokens": model_config["max_output_tokens"],
+                }
+            }
+            print(f"[DEBUG] Gemini API payload: {json.dumps(payload)[:500]}...")
+            try:
+                api_response = requests.post(url, json=payload, timeout=60)
+                print(f"[DEBUG] Gemini API raw response: {api_response.text[:500]}...")
+                api_response.raise_for_status()
+                result = api_response.json()
+                print(f"[DEBUG] Gemini API parsed response: {json.dumps(result)[:500]}...")
+                # Create a response object that mimics litellm.completion() response
+                class MockResponse:
+                    def __init__(self, content, usage_data):
+                        self.choices = [type('obj', (object,), {'message': type('obj', (object,), {'content': content})()})]
+                        self.usage = type('obj', (object,), usage_data)()
+                if "candidates" in result and len(result["candidates"]) > 0:
+                    content = result["candidates"][0]["content"]["parts"][0]["text"]
+                    usage_data = {
+                        "prompt_tokens": result.get("usageMetadata", {}).get("promptTokenCount", 0),
+                        "completion_tokens": result.get("usageMetadata", {}).get("candidatesTokenCount", 0),
+                        "total_tokens": result.get("usageMetadata", {}).get("totalTokenCount", 0)
+                    }
+                    response = MockResponse(content, usage_data)
+                else:
+                    print(f"[DEBUG] Unexpected Gemini API response: {result}")
+                    raise ValueError(f"Unexpected Gemini API response: {result}")
+            except requests.exceptions.RequestException as e:
+                print(f"[DEBUG] Gemini API request failed: {str(e)}")
+                raise Exception(f"Gemini API request failed: {str(e)}")
         elif model_id == "deepseek":
             response = litellm.completion(
                 model=model_config["model"], 

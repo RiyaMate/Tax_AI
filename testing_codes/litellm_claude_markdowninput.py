@@ -12,7 +12,7 @@ load_dotenv()
 # Configure LiteLLM with your Anthropic API key
 # Use the provider-specific key for Anthropic
 litellm.anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
-print(f"Anthropic API key set: {'✓' if litellm.anthropic_api_key else '✗'}")
+print(f"Anthropic API key set: {'[OK]' if litellm.anthropic_api_key else '[NO]'}")
 
 def encode_image_to_base64(image_path: str) -> str:
     """Convert an image file to base64 encoding."""

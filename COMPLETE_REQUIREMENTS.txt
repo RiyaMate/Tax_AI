@@ -1,0 +1,268 @@
+# Complete Requirements for LiteLLM Tax Summary Generator
+# All dependencies across frontend, backend, and core functionality
+
+# ============================================================================
+# PYTHON VERSION
+# ============================================================================
+# Requires: Python 3.10+
+# Tested on: Python 3.10, 3.11, 3.12
+
+# ============================================================================
+# CORE DEPENDENCIES (pyproject.toml)
+# ============================================================================
+
+boto3>=1.37.11,<2.0.0                    # AWS S3 integration
+pytest>=8.3.5,<9.0.0                     # Testing framework
+litellm>=1.63.6,<2.0.0                   # LLM API abstraction
+anthropic>=0.49.0,<0.50.0                # Claude API (Anthropic)
+pymupdf>=1.25.4,<2.0.0                   # PDF reading (fitz)
+redis>=5.2.1,<6.0.0                      # Caching and queue
+matplotlib>=3.10.1,<4.0.0                # Plotting and visualization
+
+# ============================================================================
+# FRONTEND DEPENDENCIES (frontend/requirements.txt + pyproject.toml)
+# ============================================================================
+
+# Web Framework & UI
+streamlit>=1.29.0                        # Web UI framework
+streamlit>=1.42.2                        # Latest version support
+
+# HTTP & Web
+requests>=2.31.0                         # HTTP library
+requests>=2.32.3                         # Latest version
+
+# Data Processing
+pandas>=2.2.3                            # Data manipulation
+numpy                                    # Numerical computing
+matplotlib                               # Plotting
+
+# Document Processing
+beautifulsoup4>=4.11.0                  # HTML parsing
+python-dotenv                            # Environment variables
+landingai-ade>=0.1.0                    # LandingAI document extraction
+pdfplumber>=0.11.4                      # PDF text extraction
+pymupdf4llm>=0.0.17                     # PDF to Markdown conversion
+markitdown>=0.0.1a4                     # Markdown conversion
+
+# LLM APIs
+google-generativeai>=0.3.0              # Google Gemini API
+openai>=1.0.0                           # OpenAI API (GPT)
+anthropic>=0.49.0                       # Claude API (already in core)
+
+# PDF & Form Generation
+reportlab                                # PDF generation with Python
+PyMuPDF>=1.24.0                         # PDF manipulation (fitz)
+
+# ============================================================================
+# BACKEND DEPENDENCIES (api/requirements.txt + pyproject.toml)
+# ============================================================================
+
+# Web Framework
+fastapi>=0.115.8                         # Modern API framework
+uvicorn>=0.34.0                         # ASGI server
+python-multipart>=0.0.20                # Form data parsing
+
+# Configuration & Security
+python-dotenv>=1.0.1                    # Environment variables
+bcrypt>=4.2.1                           # Password hashing
+
+# Data Processing
+pandas>=2.2.3                           # Data manipulation
+numpy                                   # Numerical computing
+
+# Document Extraction & OCR
+docling>=2.24.0                         # Modern document understanding
+PyMuPDF>=1.24.0                         # PDF manipulation
+pdfplumber>=0.11.4                      # PDF text extraction
+camelot-py[cv]>=0.11.0                  # Table extraction from PDFs
+pytesseract>=0.3.13                     # OCR support
+Pillow>=9.0.0                           # Image processing
+transformers>=4.25.0                    # Hugging Face transformers
+torch>=2.0.0                            # PyTorch (for Donut model)
+
+# LLM Integration
+litellm>=1.0.0                          # LLM API abstraction
+openai>=1.0.0                           # OpenAI API
+anthropic>=0.49.0                       # Claude API
+
+# Cloud Storage
+google-cloud-storage                    # Google Cloud Storage
+boto3>=1.36.26                          # AWS S3
+
+# Caching & Background Tasks
+redis>=4.5.0                            # Caching layer
+async-timeout>=4.0.0                    # Async timeout handling
+
+# Testing
+pytest>=8.3.5                           # Testing framework
+
+# HTTP
+requests>=2.31.0                        # HTTP library
+
+# Other
+apify-client>=1.9.2                     # Web scraping (optional)
+llama-index>=0.12.19                    # RAG framework (optional)
+
+# ============================================================================
+# ADDITIONAL INSTALLED PACKAGES (For tax calculations)
+# ============================================================================
+
+beautifulsoup4                          # Already in frontend, for HTML parsing
+
+# ============================================================================
+# INSTALLATION INSTRUCTIONS
+# ============================================================================
+
+# Option 1: Using pyproject.toml (Recommended)
+# ============================================
+# pip install poetry
+# poetry install
+# poetry run pytest
+
+# Option 2: Using requirements files
+# ===================================
+# Basic installation:
+# pip install -r frontend/requirements.txt
+# pip install -r api/requirements.txt
+
+# Option 3: Individual component installation
+# ============================================
+# Frontend only:
+# pip install streamlit pandas numpy matplotlib beautifulsoup4 requests
+# pip install google-generativeai openai anthropic python-dotenv
+
+# Backend only:
+# pip install fastapi uvicorn pandas docling litellm openai redis
+
+# Full installation with all extras:
+# pip install -r frontend/requirements.txt -r api/requirements.txt
+# pip install reportlab  # For Form 1040 generation
+
+# ============================================================================
+# VERSION SUMMARY
+# ============================================================================
+
+[CORE]
+- Python: 3.10+
+- boto3: 1.37.11+
+- pytest: 8.3.5+
+- litellm: 1.63.6+
+- anthropic: 0.49.0+
+- pymupdf: 1.25.4+
+- redis: 5.2.1+
+- matplotlib: 3.10.1+
+
+[FRONTEND]
+- streamlit: 1.29.0+
+- pandas: 2.2.3+
+- numpy: latest
+- matplotlib: 3.10.1+
+- beautifulsoup4: 4.11.0+
+- requests: 2.31.0+
+- google-generativeai: 0.3.0+
+- openai: 1.0.0+
+- landingai-ade: 0.1.0+
+
+[BACKEND]
+- fastapi: 0.115.8+
+- uvicorn: 0.34.0+
+- pandas: 2.2.3+
+- docling: 2.24.0+
+- litellm: 1.0.0+
+- redis: 4.5.0+
+- pytorch: 2.0.0+
+- transformers: 4.25.0+
+
+[FORM GENERATION]
+- reportlab: latest
+- PyMuPDF: 1.24.0+
+
+# ============================================================================
+# SIZE ESTIMATE
+# ============================================================================
+
+Total installation size: ~3-4 GB
+- PyTorch: ~2 GB
+- Transformers: ~500 MB
+- Other packages: ~500 MB
+
+# ============================================================================
+# COMPATIBILITY
+# ============================================================================
+
+Windows: ✓ Fully supported
+macOS: ✓ Fully supported
+Linux: ✓ Fully supported
+
+Dependencies with platform considerations:
+- pytesseract: Requires Tesseract OCR installation
+- camelot-py[cv]: Requires OpenCV (cv2)
+- torch: CUDA support optional (CPU default)
+
+# ============================================================================
+# OPTIONAL DEPENDENCIES
+# ============================================================================
+
+[AI/ML Enhancements]
+torch>=2.0.0                            # GPU support (CUDA)
+transformers>=4.25.0                    # Advanced NLP models
+
+[Cloud Services]
+google-cloud-storage                    # Google Cloud
+boto3>=1.36.26                         # AWS
+apify-client>=1.9.2                    # Web scraping
+
+[Advanced Features]
+llama-index>=0.12.19                   # RAG capabilities
+redis>=4.5.0                           # Distributed caching
+
+[Testing & Debugging]
+pytest>=8.3.5                          # Unit tests
+pytest-cov                             # Coverage reports
+
+# ============================================================================
+# QUICK START
+# ============================================================================
+
+# 1. Create virtual environment
+python -m venv .venv
+source .venv/bin/activate              # On Windows: .venv\Scripts\activate
+
+# 2. Install all dependencies
+pip install -r frontend/requirements.txt
+pip install -r api/requirements.txt
+pip install reportlab                  # For Form 1040 generation
+
+# 3. Verify installation
+python -c "import streamlit, fastapi, litellm; print('✓ All core packages installed')"
+
+# 4. Run frontend
+cd frontend
+streamlit run app.py
+
+# 5. Run backend (in another terminal)
+cd api
+uvicorn main:app --reload
+
+# ============================================================================
+# TROUBLESHOOTING
+# ============================================================================
+
+[Common Issues & Solutions]
+
+Issue: torch installation too slow
+Solution: pip install torch -f https://download.pytorch.org/whl/cpu/torch_stable.html
+
+Issue: transformers model download
+Solution: Pre-download: python -c "from transformers import AutoTokenizer; AutoTokenizer.from_pretrained('gpt2')"
+
+Issue: pytesseract not found
+Solution: Install Tesseract: https://github.com/UB-Mannheim/tesseract/wiki
+
+Issue: OpenCV (cv2) import error
+Solution: pip install opencv-python
+
+Issue: AWS/GCP credentials
+Solution: Configure environment variables or ~/.aws/credentials
+
+# ============================================================================

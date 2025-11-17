@@ -13,22 +13,14 @@ st.set_page_config(page_title="Welcome - Tax Calculator", layout="wide", initial
 # Apply shared dark theme
 st.markdown(DARK_THEME_CSS, unsafe_allow_html=True)
 
-# Add logo and title to sidebar
-with st.sidebar:
-    st.markdown("""
-    <div style='text-align: center; padding: 20px 0; margin-bottom: 15px;'>
-        <div style='font-size: 3.5em; margin-bottom: 10px;'>🌱</div>
-        <div style='font-weight: 700; font-size: 1.4em; color: #10b981; letter-spacing: 1px; margin-bottom: 5px;'>GreenGrowth</div>
-        <div style='font-weight: 600; font-size: 0.9em; color: #cbd5e1; letter-spacing: 0.5px;'>CPA FIRM</div>
-        <div style='width: 80%; height: 2px; background: linear-gradient(90deg, transparent, #10b981, transparent); margin: 12px auto;'></div>
-    </div>
-    """, unsafe_allow_html=True)
-
 # Remove top padding and hide header/footer
 st.markdown("""
 <style>
     header {display: none;}
     footer {display: none;}
+    [data-testid="stToolbar"] {display: none;}
+    [data-testid="stDecoration"] {display: none;}
+    .reportview-container .main .block-container {{max-width: 100%;}}
 </style>
 """, unsafe_allow_html=True)
 

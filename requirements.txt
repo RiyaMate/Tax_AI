@@ -1,0 +1,193 @@
+# LiteLLM Tax Summary Generator - Complete Requirements
+# All 47+ packages in one file
+# Install with: pip install -r requirements.txt
+
+# Python 3.10+ required
+
+# ============================================================================
+# CORE DEPENDENCIES
+# ============================================================================
+
+boto3>=1.37.11
+pytest>=8.3.5
+litellm>=1.63.6
+anthropic>=0.49.0
+pymupdf>=1.25.4
+redis>=5.2.1
+matplotlib>=3.10.1
+
+# ============================================================================
+# FRONTEND DEPENDENCIES (Streamlit UI)
+# ============================================================================
+
+streamlit>=1.29.0
+requests>=2.31.0
+pandas>=2.2.3
+numpy>=1.24.0
+beautifulsoup4>=4.11.0
+python-dotenv>=1.0.1
+google-generativeai>=0.3.0
+openai>=1.0.0
+landingai-ade>=0.1.0
+pdfplumber>=0.11.4
+pymupdf4llm>=0.0.17
+markitdown>=0.0.1a4
+
+# ============================================================================
+# BACKEND DEPENDENCIES (FastAPI)
+# ============================================================================
+
+fastapi>=0.115.8
+uvicorn>=0.34.0
+python-multipart>=0.0.20
+bcrypt>=4.2.1
+docling>=2.24.0
+PyMuPDF>=1.24.0
+camelot-py[cv]>=0.11.0
+pytesseract>=0.3.13
+Pillow>=9.0.0
+transformers>=4.25.0
+torch>=2.0.0
+google-cloud-storage>=2.10.0
+async-timeout>=4.0.0
+apify-client>=1.9.2
+llama-index>=0.12.19
+
+# ============================================================================
+# PDF & FORM GENERATION (Form 1040)
+# ============================================================================
+
+reportlab>=3.6.0
+
+# ============================================================================
+# ALREADY INSTALLED IN YOUR VENV
+# ============================================================================
+# The following are likely already installed as dependencies:
+# - annotated-types
+# - cachetools
+# - certifi
+# - charset-normalizer
+# - colorama
+# - distro
+# - h11
+# - idna
+# - jiter
+# - protobuf
+# - pyasn1
+# - pyasn1_modules
+# - pydantic_core
+# - pyparsing
+# - rsa
+# - sniffio
+# - soupsieve
+# - tqdm
+# - typing_extensions
+# - typing-inspection
+# - uritemplate
+# - urllib3
+
+# ============================================================================
+# INSTALLATION INSTRUCTIONS
+# ============================================================================
+#
+# Method 1: Install all at once (RECOMMENDED)
+# ============================================
+# pip install -r requirements.txt
+#
+# Method 2: Install by category
+# ============================
+# Core:
+# pip install boto3 pytest litellm anthropic pymupdf redis matplotlib
+#
+# Frontend:
+# pip install streamlit pandas numpy requests beautifulsoup4 python-dotenv
+# pip install google-generativeai openai landingai-ade pdfplumber pymupdf4llm markitdown
+#
+# Backend:
+# pip install fastapi uvicorn python-multipart bcrypt docling PyMuPDF camelot-py
+# pip install pytesseract Pillow transformers torch google-cloud-storage async-timeout
+# pip install apify-client llama-index
+#
+# Forms:
+# pip install reportlab
+#
+# Method 3: Minimal (if torch too large, use CPU version)
+# ========================================================
+# pip install torch --index-url https://download.pytorch.org/whl/cpu
+#
+# ============================================================================
+# PACKAGE OVERVIEW
+# ============================================================================
+#
+# Web Framework:
+#   - streamlit: Interactive web UI
+#   - fastapi: REST API backend
+#   - uvicorn: ASGI server
+#
+# Data Processing:
+#   - pandas: Data manipulation
+#   - numpy: Numerical computing
+#   - beautifulsoup4: HTML parsing
+#
+# Document Processing:
+#   - pymupdf: PDF reading (fitz)
+#   - PyMuPDF: PDF manipulation
+#   - pdfplumber: PDF extraction
+#   - pytesseract: OCR
+#   - docling: Document understanding
+#   - camelot-py: Table extraction
+#
+# LLM & AI:
+#   - litellm: LLM abstraction
+#   - openai: ChatGPT API
+#   - anthropic: Claude API
+#   - google-generativeai: Gemini API
+#   - transformers: Hugging Face models
+#   - torch: PyTorch deep learning
+#
+# PDF Generation:
+#   - reportlab: Create Form 1040 PDF
+#   - Pillow: Image processing
+#
+# Cloud Services:
+#   - boto3: AWS S3
+#   - google-cloud-storage: Google Cloud
+#
+# Other:
+#   - requests: HTTP client
+#   - redis: Caching
+#   - python-dotenv: Environment variables
+#   - bcrypt: Password hashing
+#   - pytest: Testing
+#   - matplotlib: Plotting
+#
+# ============================================================================
+# VERIFY INSTALLATION
+# ============================================================================
+#
+# Check all packages installed:
+# pip check
+#
+# List all packages:
+# pip list
+#
+# Test core imports:
+# python -c "import streamlit, fastapi, pandas, torch, litellm; print('✓ All installed')"
+#
+# ============================================================================
+# NOTES
+# ============================================================================
+#
+# Python Version: 3.10+ required
+# Total Size: 3-4 GB (mainly PyTorch)
+# Installation Time: 10-15 minutes
+# Disk Space: ~10 GB total recommended
+#
+# Special Dependencies:
+# - PyTorch (torch) is 2 GB - uses CPU by default
+# - Tesseract OCR needs separate installation:
+#   * Windows: Download from GitHub
+#   * macOS: brew install tesseract
+#   * Linux: sudo apt-get install tesseract-ocr
+#
+# ============================================================================

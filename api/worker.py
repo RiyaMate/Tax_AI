@@ -25,7 +25,8 @@ logging.basicConfig(
 logger = logging.getLogger("llm_worker")
 
 # Load environment variables
-load_dotenv()
+load_dotenv(override=True)
+print(f"[WORKER DEBUG] GEMINI_API_KEY at startup: {os.getenv('GEMINI_API_KEY')}")
 
 # Import LLM extraction modules
 from llm_extractor.litellm_query_generator import (
@@ -328,7 +329,7 @@ class LLMWorker:
                     for message_id, fields in messages:
                         # Process message
                         request_data = {k: v for k, v in fields.items()}
-                        
+                        print(f"[WORKER DEBUG] Full request_data: {request_data}")
                         logger.info(f"Received request {request_data.get('request_id', 'unknown')} from {stream_name}")
                         
                         # Process the request

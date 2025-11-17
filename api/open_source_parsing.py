@@ -1,37 +1,67 @@
 import os
 import requests
-import boto3
+from google.cloud import storage
 import re
 from dotenv import load_dotenv
 from pathlib import Path
-from botocore.exceptions import ClientError
 
 # Load environment variables
 load_dotenv()
 
-# AWS S3 Configuration
-session = boto3.Session(
-    aws_access_key_id=os.getenv('AWS_SERVER_PUBLIC_KEY'),
-    aws_secret_access_key=os.getenv('AWS_SERVER_SECRET_KEY'),
-)
-s3 = session.client('s3', region_name=os.getenv('AWS_REGION'))
-bucket_name = os.getenv('AWS_BUCKET_NAME')
+# Google Cloud Storage Configuration
+gcp_project_id = os.getenv('GCP_PROJECT_ID')
+gcs_bucket_name = os.getenv('GCS_BUCKET_NAME')
 
-def check_file_exists_in_s3(object_name):
-    """Check if a file exists in S3."""
+# Lazy initialization of GCS client
+_gcs_client = None
+_bucket = None
+
+def get_gcs_client():
+    """Get or initialize GCS client lazily."""
+    global _gcs_client
+    if _gcs_client is None:
+        try:
+            _gcs_client = storage.Client(project=gcp_project_id)
+        except Exception as e:
+            print(f"Warning: Could not initialize GCS client: {e}")
+            print("GCS operations will not be available.")
+            return None
+    return _gcs_client
+
+def get_bucket():
+    """Get or initialize GCS bucket lazily."""
+    global _bucket
+    if _bucket is None:
+        client = get_gcs_client()
+        if client:
+            _bucket = client.bucket(gcs_bucket_name)
+    return _bucket
+
+# For backwards compatibility
+@property
+def gcs_client():
+    return get_gcs_client()
+
+@property
+def bucket():
+    return get_bucket()
+
+def check_file_exists_in_gcs(blob_name):
+    """Check if a file exists in GCS."""
     try:
-        s3.head_object(Bucket=bucket_name, Key=object_name)
-        return True
-    except ClientError as e:
-        if e.response['Error']['Code'] == '404':
+        b = get_bucket()
+        if not b:
             return False
-        else:
-            raise
+        blob = b.blob(blob_name)
+        return blob.exists()
+    except Exception as e:
+        print(f"Error checking file existence: {e}")
+        return False
 
-def get_versioned_object_name(base_object_name):
-    """Generate a versioned object name for S3."""
+def get_versioned_blob_name(base_blob_name):
+    """Generate a versioned blob name for GCS."""
     # Extract base name and extension
-    path = Path(base_object_name)
+    path = Path(base_blob_name)
     folder = str(path.parent)
     name = path.stem
     ext = path.suffix
@@ -48,39 +78,47 @@ def get_versioned_object_name(base_object_name):
         # No version suffix, add v1
         new_name = f"{name}_v1"
     
-    # Create new object name
+    # Create new blob name
     if folder and folder != '.':
         return f"{folder}/{new_name}{ext}"
     else:
         return f"{new_name}{ext}"
 
-def upload_pdf_to_s3(file_path, object_name):
-    """Upload a PDF to S3 with version control."""
+def upload_pdf_to_gcs(file_path, blob_name):
+    """Upload a PDF to GCS with version control."""
     try:
-        # Check if file exists in S3
-        if check_file_exists_in_s3(object_name):
-            # Generate versioned object name
-            object_name = get_versioned_object_name(object_name)
+        # Check if file exists in GCS
+        if check_file_exists_in_gcs(blob_name):
+            # Generate versioned blob name
+            blob_name = get_versioned_blob_name(blob_name)
         
         # Upload file
-        s3.upload_file(file_path, bucket_name, object_name)
+        b = get_bucket()
+        if not b:
+            raise Exception("GCS bucket not available")
+        blob = b.blob(blob_name)
+        blob.upload_from_filename(file_path)
         return {
             "status": "success",
-            "message": f"Uploaded {file_path} to s3://{bucket_name}/{object_name}",
-            "object_name": object_name
+            "message": f"Uploaded {file_path} to gs://{gcs_bucket_name}/{blob_name}",
+            "blob_name": blob_name
         }
     except Exception as e:
         return {
             "status": "error",
             "message": f"Error uploading file {file_path}: {e}",
-            "object_name": None
+            "blob_name": None
         }
 
-def upload_file_to_s3(file_path, object_name):
-    """Uploads a file to S3."""
+def upload_file_to_gcs(file_path, blob_name):
+    """Uploads a file to GCS."""
     try:
-        s3.upload_file(file_path, bucket_name, object_name)
-        return f"Uploaded {file_path} to s3://{bucket_name}/{object_name}"
+        b = get_bucket()
+        if not b:
+            raise Exception("GCS bucket not available")
+        blob = b.blob(blob_name)
+        blob.upload_from_filename(file_path)
+        return f"Uploaded {file_path} to gs://{gcs_bucket_name}/{blob_name}"
     except Exception as e:
         return f"Error uploading file {file_path}: {e}"
 
@@ -95,8 +133,8 @@ def download_pdf(url, output_path):
         raise Exception(f"Failed to download PDF. Status code: {response.status_code}")
 
 def upload_pdf_to_raw_input(file_path):
-    """Upload PDF to the raw input folder in S3 with version control."""
+    """Upload PDF to the raw input folder in GCS with version control."""
     pdf_filename = os.path.basename(file_path)
-    s3_path = f"rawinput/{pdf_filename}"
-    return upload_pdf_to_s3(file_path, s3_path)
+    gcs_path = f"rawinput/{pdf_filename}"
+    return upload_pdf_to_gcs(file_path, gcs_path)
 

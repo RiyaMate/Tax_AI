@@ -1,0 +1,71 @@
+# LiteLLM Tax Summary Generator - Complete Requirements File
+# Python 3.10+ required
+# Install with: pip install -r requirements-all.txt
+
+# ============================================================================
+# CORE & COMMON DEPENDENCIES
+# ============================================================================
+
+boto3>=1.37.11
+pytest>=8.3.5
+litellm>=1.63.6
+anthropic>=0.49.0
+pymupdf>=1.25.4
+redis>=5.2.1
+matplotlib>=3.10.1
+
+# ============================================================================
+# FRONTEND DEPENDENCIES
+# ============================================================================
+
+streamlit>=1.29.0
+requests>=2.31.0
+pandas>=2.2.3
+numpy>=1.24.0
+beautifulsoup4>=4.11.0
+python-dotenv>=1.0.1
+google-generativeai>=0.3.0
+openai>=1.0.0
+landingai-ade>=0.1.0
+pdfplumber>=0.11.4
+pymupdf4llm>=0.0.17
+markitdown>=0.0.1a4
+
+# ============================================================================
+# BACKEND DEPENDENCIES
+# ============================================================================
+
+fastapi>=0.115.8
+uvicorn>=0.34.0
+python-multipart>=0.0.20
+bcrypt>=4.2.1
+docling>=2.24.0
+PyMuPDF>=1.24.0
+camelot-py[cv]>=0.11.0
+pytesseract>=0.3.13
+Pillow>=9.0.0
+transformers>=4.25.0
+torch>=2.0.0
+google-cloud-storage>=2.10.0
+async-timeout>=4.0.0
+apify-client>=1.9.2
+llama-index>=0.12.19
+
+# ============================================================================
+# PDF & FORM GENERATION (NEW - For Form 1040)
+# ============================================================================
+
+reportlab>=3.6.0
+
+# ============================================================================
+# OPTIONAL: For GPU/CUDA support (uncomment if needed)
+# ============================================================================
+# torch[cuda]>=2.0.0  # Remove regular torch above and use this instead
+
+# ============================================================================
+# OPTIONAL: For development & testing
+# ============================================================================
+# pytest-cov>=4.0.0
+# black>=23.0.0
+# flake8>=6.0.0
+# mypy>=1.0.0
