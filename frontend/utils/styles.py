@@ -59,12 +59,15 @@ DARK_THEME_CSS = """<style>
         background: #0f0f0f !important;
         border-right: 2px solid #10b981 !important;
         box-shadow: 2px 0 20px rgba(16, 185, 129, 0.15) !important;
+        min-width: 250px !important;
+        max-width: 300px !important;
     }
     [data-testid="stSidebar"] > div:first-child {
         background: #0f0f0f !important;
         width: 100% !important;
         display: flex !important;
         flex-direction: column !important;
+        min-height: 100vh !important;
     }
     [data-testid="stSidebar"] > div {
         background: #0f0f0f !important;
@@ -80,18 +83,16 @@ DARK_THEME_CSS = """<style>
     [data-testid="stSidebar"] [data-testid="stPageLink-NavLink"] {
         background: rgba(16, 185, 129, 0.08) !important;
         border-radius: 8px !important;
-        margin: 12px auto !important;
+        margin: 12px 16px !important;
         padding: 14px 16px !important;
         color: #cbd5e1 !important;
         border: none !important;
         transition: all 0.3s ease !important;
         font-weight: 500 !important;
         letter-spacing: 0.3px !important;
-        width: 85% !important;
-        text-align: center !important;
-        display: flex !important;
-        justify-content: center !important;
-        align-items: center !important;
+        width: calc(100% - 32px) !important;
+        text-align: left !important;
+        display: block !important;
     }
     [data-testid="stSidebar"] [data-testid="stPageLink-NavLink"]:hover {
         background: rgba(16, 185, 129, 0.15) !important;
@@ -112,8 +113,8 @@ DARK_THEME_CSS = """<style>
         width: 100% !important;
         display: flex !important;
         flex-direction: column !important;
-        justify-content: center !important;
-        align-items: center !important;
+        justify-content: flex-start !important;
+        align-items: stretch !important;
     }
     
     /* Remove default streamlit styling */
@@ -477,123 +478,234 @@ DARK_THEME_CSS = """<style>
             padding-right: 0.75rem !important;
             padding-top: 1rem !important;
             padding-bottom: 1rem !important;
+            max-width: 100% !important;
         }
         
         /* Responsive headers */
         h1 {
-            font-size: 1.8em !important;
-            margin-bottom: 0.8em !important;
-            padding: 15px !important;
+            font-size: 1.6em !important;
+            margin-bottom: 0.6em !important;
+            padding: 10px !important;
+            word-wrap: break-word !important;
         }
         
         h2 {
-            font-size: 1.4em !important;
-            margin-bottom: 0.5em !important;
-        }
-        
-        h3 {
-            font-size: 1.1em !important;
+            font-size: 1.3em !important;
             margin-bottom: 0.4em !important;
         }
         
-        /* Responsive columns - stack on mobile */
+        h3 {
+            font-size: 1.05em !important;
+            margin-bottom: 0.3em !important;
+        }
+        
+        /* Force horizontal blocks to stack */
         [data-testid="stHorizontalBlock"] {
+            display: flex !important;
             flex-direction: column !important;
-            gap: 1rem !important;
+            gap: 0.8rem !important;
+            width: 100% !important;
         }
         
         [data-testid="stColumn"] {
             width: 100% !important;
             min-width: 100% !important;
+            max-width: 100% !important;
+            flex: 1 !important;
+        }
+        
+        [data-testid="stVerticalBlock"] > [data-testid="stColumn"] {
+            width: 100% !important;
         }
         
         /* Input fields responsive */
         input, select, textarea {
             font-size: 16px !important;
-            padding: 10px 12px !important;
+            padding: 12px 10px !important;
+            width: 100% !important;
+            max-width: 100% !important;
+        }
+        
+        .stTextInput > div > div > input,
+        .stNumberInput > div > div > input,
+        .stSelectbox > div > div > select,
+        .stTextArea > div > div > textarea {
+            width: 100% !important;
+            max-width: 100% !important;
         }
         
         label {
             font-size: 0.9em !important;
-            margin-bottom: 0.3em !important;
+            margin-bottom: 0.4em !important;
+            display: block !important;
+            width: 100% !important;
         }
         
-        /* Button sizing for touch */
+        /* Button sizing for touch - large hit targets */
         .stButton > button {
-            padding: 12px 20px !important;
+            padding: 14px 16px !important;
             font-size: 0.9em !important;
-            min-height: 44px !important;
+            min-height: 48px !important;
             border-radius: 6px !important;
+            width: 100% !important;
+            max-width: 100% !important;
+        }
+        
+        [data-testid="stButton"] {
+            width: 100% !important;
+        }
+        
+        [data-testid="stButton"] > button {
+            width: 100% !important;
         }
         
         /* Metric cards - responsive */
         [data-testid="metric-container"] {
             padding: 0.8em !important;
-            margin: 0.5em 0 !important;
+            margin: 0.6em 0 !important;
+            width: 100% !important;
         }
         
-        /* Tabs - better touch targets */
-        [role="tablist"] {
-            gap: 0.5rem !important;
-            overflow-x: auto !important;
+        [data-testid="stMetric"] {
+            width: 100% !important;
         }
         
-        [role="tab"] {
-            padding: 10px 12px !important;
-            font-size: 0.85em !important;
-            min-width: auto !important;
+        [data-testid="stMetricRow"] {
+            flex-direction: column !important;
+            width: 100% !important;
         }
         
-        /* Sidebar on mobile */
-        [data-testid="stSidebar"] {
+        /* Chat container mobile */
+        [data-testid="stContainer"] {
             width: 100% !important;
             max-width: 100% !important;
         }
         
+        /* Tabs - better touch targets */
+        [role="tablist"] {
+            gap: 0.3rem !important;
+            overflow-x: auto !important;
+            flex-wrap: wrap !important;
+        }
+        
+        [role="tab"] {
+            padding: 10px 10px !important;
+            font-size: 0.8em !important;
+            min-width: auto !important;
+            flex: 1 !important;
+            min-height: 40px !important;
+        }
+        
+        /* Sidebar on mobile - full width when expanded */
+        [data-testid="stSidebar"] {
+            width: 100vw !important;
+            max-width: 100vw !important;
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
+            height: 100vh !important;
+            z-index: 999999 !important;
+            background: #0f0f0f !important;
+            border-right: 2px solid #10b981 !important;
+            overflow-y: auto !important;
+            padding: 1rem 0 !important;
+        }
+        
         [data-testid="stSidebar"] [data-testid="stPageLink-NavLink"] {
-            width: 95% !important;
-            padding: 12px 14px !important;
-            margin: 8px auto !important;
-            font-size: 0.9em !important;
+            display: block !important;
+            width: calc(100% - 24px) !important;
+            padding: 16px 12px !important;
+            margin: 8px 12px !important;
+            font-size: 0.95em !important;
+            background: rgba(16, 185, 129, 0.08) !important;
+            border-radius: 8px !important;
+            color: #cbd5e1 !important;
+            text-align: left !important;
+            border: none !important;
+            transition: all 0.3s ease !important;
+        }
+        
+        [data-testid="stSidebar"] [data-testid="stPageLink-NavLink"]:hover {
+            background: rgba(16, 185, 129, 0.2) !important;
+            color: #10b981 !important;
+            transform: translateX(4px) !important;
+        }
+        
+        [data-testid="stSidebar"] [data-testid="stPageLink-NavLink"][aria-current="page"] {
+            background: rgba(16, 185, 129, 0.3) !important;
+            color: #10b981 !important;
+            font-weight: 600 !important;
+            box-shadow: inset 0 0 15px rgba(16, 185, 129, 0.1) !important;
         }
         
         /* Expander - mobile friendly */
         [data-testid="stExpander"] {
             border-radius: 6px !important;
+            width: 100% !important;
         }
         
         [data-testid="stExpander"] summary {
-            font-size: 0.95em !important;
-            padding: 10px !important;
+            font-size: 0.9em !important;
+            padding: 10px 8px !important;
+            min-height: 40px !important;
         }
         
         /* Reduce divider margins on mobile */
         hr {
-            margin: 0.5rem 0 !important;
+            margin: 0.8rem 0 !important;
         }
         
         /* Download buttons - stack on mobile */
-        [data-testid="stHorizontalBlock"] [data-testid="stColumn"] {
-            min-width: 100% !important;
-            flex: 1 !important;
+        [data-testid="stDownloadButton"] {
+            width: 100% !important;
+        }
+        
+        [data-testid="stDownloadButton"] > button {
+            width: 100% !important;
         }
         
         /* Better spacing for forms */
-        .stTextInput, .stNumberInput, .stSelectbox, .stDateInput {
-            margin-bottom: 0.6rem !important;
+        .stTextInput, .stNumberInput, .stSelectbox, .stDateInput, .stTextArea {
+            margin-bottom: 0.8rem !important;
+            width: 100% !important;
         }
         
         /* Text readability on mobile */
         p, span {
             font-size: 0.95em !important;
             line-height: 1.5 !important;
+            word-wrap: break-word !important;
         }
         
         /* Container padding */
         [data-testid="stVerticalBlockBorderWrapper"] {
-            padding: 1rem !important;
+            padding: 0.8rem !important;
             margin: 0.5rem 0 !important;
             border-radius: 8px !important;
+            width: 100% !important;
+        }
+        
+        /* Centered content */
+        [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+            text-align: center !important;
+        }
+        
+        /* Chat input full width */
+        [data-testid="stChatInput"] {
+            width: 100% !important;
+        }
+        
+        [data-testid="stChatInput"] input {
+            width: 100% !important;
+        }
+        
+        /* Form elements full width */
+        [data-testid="stForm"] {
+            width: 100% !important;
+        }
+        
+        [data-testid="stForm"] > div {
+            width: 100% !important;
         }
     }
     
@@ -656,6 +768,24 @@ DARK_THEME_CSS = """<style>
         p, span {
             font-size: 0.9em !important;
         }
+        
+        /* Sidebar for very small screens */
+        [data-testid="stSidebar"] {
+            width: 100vw !important;
+            max-width: 100vw !important;
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
+            height: 100vh !important;
+            padding: 2rem 0 1rem 0 !important;
+        }
+        
+        [data-testid="stSidebar"] [data-testid="stPageLink-NavLink"] {
+            width: calc(100% - 20px) !important;
+            padding: 14px 10px !important;
+            margin: 6px 10px !important;
+            font-size: 0.9em !important;
+        }
     }
     
     /* ===============================================================
@@ -681,6 +811,18 @@ DARK_THEME_CSS = """<style>
         
         [data-testid="stColumn"] {
             width: 100% !important;
+        }
+        
+        /* Sidebar for tablets */
+        [data-testid="stSidebar"] {
+            max-width: 200px !important;
+            width: 200px !important;
+        }
+        [data-testid="stSidebar"] [data-testid="stPageLink-NavLink"] {
+            width: calc(100% - 20px) !important;
+            margin: 8px 10px !important;
+            padding: 12px 12px !important;
+            font-size: 0.9em !important;
         }
     }
 </style>"""
