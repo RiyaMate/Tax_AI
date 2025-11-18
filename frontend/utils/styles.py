@@ -466,6 +466,223 @@ DARK_THEME_CSS = """<style>
         align-items: center !important;
         justify-content: center !important;
     }
+    
+    /* ===============================================================
+       MOBILE-FRIENDLY RESPONSIVE DESIGN (768px and below)
+       =============================================================== */
+    @media (max-width: 768px) {
+        /* Page layout adjustments */
+        .block-container {
+            padding-left: 0.75rem !important;
+            padding-right: 0.75rem !important;
+            padding-top: 1rem !important;
+            padding-bottom: 1rem !important;
+        }
+        
+        /* Responsive headers */
+        h1 {
+            font-size: 1.8em !important;
+            margin-bottom: 0.8em !important;
+            padding: 15px !important;
+        }
+        
+        h2 {
+            font-size: 1.4em !important;
+            margin-bottom: 0.5em !important;
+        }
+        
+        h3 {
+            font-size: 1.1em !important;
+            margin-bottom: 0.4em !important;
+        }
+        
+        /* Responsive columns - stack on mobile */
+        [data-testid="stHorizontalBlock"] {
+            flex-direction: column !important;
+            gap: 1rem !important;
+        }
+        
+        [data-testid="stColumn"] {
+            width: 100% !important;
+            min-width: 100% !important;
+        }
+        
+        /* Input fields responsive */
+        input, select, textarea {
+            font-size: 16px !important;
+            padding: 10px 12px !important;
+        }
+        
+        label {
+            font-size: 0.9em !important;
+            margin-bottom: 0.3em !important;
+        }
+        
+        /* Button sizing for touch */
+        .stButton > button {
+            padding: 12px 20px !important;
+            font-size: 0.9em !important;
+            min-height: 44px !important;
+            border-radius: 6px !important;
+        }
+        
+        /* Metric cards - responsive */
+        [data-testid="metric-container"] {
+            padding: 0.8em !important;
+            margin: 0.5em 0 !important;
+        }
+        
+        /* Tabs - better touch targets */
+        [role="tablist"] {
+            gap: 0.5rem !important;
+            overflow-x: auto !important;
+        }
+        
+        [role="tab"] {
+            padding: 10px 12px !important;
+            font-size: 0.85em !important;
+            min-width: auto !important;
+        }
+        
+        /* Sidebar on mobile */
+        [data-testid="stSidebar"] {
+            width: 100% !important;
+            max-width: 100% !important;
+        }
+        
+        [data-testid="stSidebar"] [data-testid="stPageLink-NavLink"] {
+            width: 95% !important;
+            padding: 12px 14px !important;
+            margin: 8px auto !important;
+            font-size: 0.9em !important;
+        }
+        
+        /* Expander - mobile friendly */
+        [data-testid="stExpander"] {
+            border-radius: 6px !important;
+        }
+        
+        [data-testid="stExpander"] summary {
+            font-size: 0.95em !important;
+            padding: 10px !important;
+        }
+        
+        /* Reduce divider margins on mobile */
+        hr {
+            margin: 0.5rem 0 !important;
+        }
+        
+        /* Download buttons - stack on mobile */
+        [data-testid="stHorizontalBlock"] [data-testid="stColumn"] {
+            min-width: 100% !important;
+            flex: 1 !important;
+        }
+        
+        /* Better spacing for forms */
+        .stTextInput, .stNumberInput, .stSelectbox, .stDateInput {
+            margin-bottom: 0.6rem !important;
+        }
+        
+        /* Text readability on mobile */
+        p, span {
+            font-size: 0.95em !important;
+            line-height: 1.5 !important;
+        }
+        
+        /* Container padding */
+        [data-testid="stVerticalBlockBorderWrapper"] {
+            padding: 1rem !important;
+            margin: 0.5rem 0 !important;
+            border-radius: 8px !important;
+        }
+    }
+    
+    /* ===============================================================
+       SMALL MOBILE (480px and below)
+       =============================================================== */
+    @media (max-width: 480px) {
+        /* Very small screens */
+        h1 {
+            font-size: 1.5em !important;
+            padding: 12px !important;
+        }
+        
+        h2 {
+            font-size: 1.2em !important;
+        }
+        
+        h3 {
+            font-size: 1em !important;
+        }
+        
+        .block-container {
+            padding-left: 0.5rem !important;
+            padding-right: 0.5rem !important;
+        }
+        
+        /* Buttons more touchable */
+        .stButton > button {
+            width: 100% !important;
+            padding: 12px 16px !important;
+            font-size: 0.85em !important;
+        }
+        
+        /* Input sizing */
+        input, select, textarea {
+            font-size: 16px !important;
+            padding: 12px 10px !important;
+        }
+        
+        /* Metrics stack better */
+        [data-testid="stMetricRow"] {
+            flex-direction: column !important;
+        }
+        
+        /* Reduce gaps */
+        [data-testid="stHorizontalBlock"] {
+            gap: 0.5rem !important;
+        }
+        
+        /* Radio buttons and checkboxes */
+        [data-testid="stRadio"] {
+            font-size: 0.9em !important;
+        }
+        
+        /* Better text sizing */
+        label {
+            font-size: 0.85em !important;
+        }
+        
+        p, span {
+            font-size: 0.9em !important;
+        }
+    }
+    
+    /* ===============================================================
+       TABLET & LANDSCAPE (769px - 1024px)
+       =============================================================== */
+    @media (min-width: 769px) and (max-width: 1024px) {
+        h1 {
+            font-size: 2em !important;
+        }
+        
+        h2 {
+            font-size: 1.6em !important;
+        }
+        
+        .block-container {
+            max-width: 90% !important;
+        }
+        
+        /* 2-column layout on tablets */
+        [data-testid="stHorizontalBlock"] {
+            gap: 1rem !important;
+        }
+        
+        [data-testid="stColumn"] {
+            width: 100% !important;
+        }
+    }
 </style>"""
 
 def apply_theme(st_app):

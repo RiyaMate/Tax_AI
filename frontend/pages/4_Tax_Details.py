@@ -4,6 +4,13 @@ from datetime import datetime
 from utils.state import init_session_state
 from utils.styles import DARK_THEME_CSS
 
+# Set page config for mobile
+st.set_page_config(
+    page_title="Tax Details",
+    layout="centered",
+    initial_sidebar_state="auto"
+)
+
 init_session_state()
 
 # Apply shared dark theme

@@ -14,12 +14,13 @@ from utils.tax_engine import (
 )
 from utils.styles import DARK_THEME_CSS
 
-# Set page configuration
+# Set page configuration with mobile support
 st.set_page_config(
     page_title="Tax Calculator",
-    page_icon="[MONEY]",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    page_icon="💰",
+    layout="centered",
+    initial_sidebar_state="auto",
+    menu_items={"About": "2024 Tax Calculation Engine"}
 )
 
 # Apply shared dark theme
@@ -445,6 +446,65 @@ if "tax_calculation_result" in st.session_state:
     st.header("📄 GENERATE FORM 1040 PDF")
     st.markdown("**Download a professional Form 1040 PDF based on your tax calculation above.**")
     
+    # Define filing status mapping
+    filing_status_map = {
+        "single": "Single",
+        "married_filing_jointly": "Married Filing Jointly",
+        "married_filing_separately": "Married Filing Separately",
+        "head_of_household": "Head of Household",
+        "qualifying_widow": "Qualifying Widow(er)",
+    }
+    
+    # Auto-populate from extracted data if available
+    taxpayer_first = st.session_state.get("first_name", "Taxpayer")
+    taxpayer_last = st.session_state.get("last_name", "")
+    taxpayer_ssn = st.session_state.get("ssn", "XXX-XX-XXXX")
+    
+    # Try to extract personal info from parsed documents
+    if "parsed_documents" in st.session_state and st.session_state.parsed_documents:
+        for doc in st.session_state.parsed_documents:
+            extracted = doc.get("result", {}).get("extracted_fields", {})
+            if extracted:
+                # Try to get name from extracted data
+                if not taxpayer_first or taxpayer_first == "Taxpayer":
+                    taxpayer_first = extracted.get("name", extracted.get("first_name", taxpayer_first))
+                if not taxpayer_last:
+                    taxpayer_last = extracted.get("last_name", taxpayer_last)
+                if taxpayer_ssn == "XXX-XX-XXXX":
+                    taxpayer_ssn = extracted.get("ssn", extracted.get("tax_id", taxpayer_ssn))
+                break
+    
+    # Display extracted personal info
+    st.markdown("### 📋 Personal Information from Extracted Data")
+    info_col1, info_col2 = st.columns(2)
+    
+    with info_col1:
+        st.markdown(f"**Name:** {taxpayer_first} {taxpayer_last}")
+        st.markdown(f"**SSN:** {taxpayer_ssn}")
+    
+    with info_col2:
+        st.markdown(f"**Tax Year:** 2024")
+        st.markdown(f"**Filing Status:** {filing_status_map.get(filing_status.lower(), 'Single')}")
+    
+    # Display tax calculation results
+    st.markdown("### 💰 Tax Calculation Results")
+    tax_result_col1, tax_result_col2, tax_result_col3 = st.columns(3)
+    
+    with tax_result_col1:
+        st.metric("Total Income", f"${income.get('total_income', 0):,.2f}")
+        st.metric("Deductions", f"${deduction_info.get('amount', 0):,.2f}")
+    
+    with tax_result_col2:
+        st.metric("Taxable Income", f"${result.get('taxable_income', 0):,.2f}")
+        st.metric("Total Tax", f"${result.get('total_tax_liability', 0):,.2f}")
+    
+    with tax_result_col3:
+        st.metric("Fed. Withheld", f"${withholding.get('federal_withheld', 0):,.2f}")
+        if result_type.lower() == "refund":
+            st.metric("Refund Amount", f"${refund_amount:,.2f}", delta="✓", delta_color="off")
+        else:
+            st.metric("Amount Owed", f"${refund_amount:,.2f}", delta="!", delta_color="inverse")
+    
     # Import requests for API call
     import requests
     
@@ -461,19 +521,6 @@ if "tax_calculation_result" in st.session_state:
     if st.button("📥 Generate & Download Form 1040 PDF", use_container_width=True, type="primary", key="form_1040_btn"):
         with st.spinner("🔄 Generating Form 1040 PDF..."):
             try:
-                # Get first name and last name from session state
-                taxpayer_first = st.session_state.get("first_name", "Taxpayer")
-                taxpayer_last = st.session_state.get("last_name", "")
-                taxpayer_ssn = st.session_state.get("ssn", "XXX-XX-XXXX")
-                
-                # Map filing status to proper enum format
-                filing_status_map = {
-                    "single": "Single",
-                    "married_filing_jointly": "Married Filing Jointly",
-                    "married_filing_separately": "Married Filing Separately",
-                    "head_of_household": "Head of Household",
-                    "qualifying_widow": "Qualifying Widow(er)",
-                }
                 taxpayer_filing_status = filing_status_map.get(filing_status.lower(), "Single")
                 taxpayer_year = 2024
                 taxpayer_dependents = num_dependents

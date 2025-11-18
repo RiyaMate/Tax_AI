@@ -8,25 +8,37 @@ print(f"[DEBUG] Frontend .env loaded. VISION_AGENT_API_KEY: {os.getenv('VISION_A
 import streamlit as st
 from utils.styles import DARK_THEME_CSS
 
-st.set_page_config(page_title="Welcome - Tax Calculator", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(
+    page_title="Welcome - Tax Calculator",
+    layout="centered",
+    initial_sidebar_state="auto",
+    menu_items={"About": "GreenGrowth Tax AI System"}
+)
 
 # Apply shared dark theme
 st.markdown(DARK_THEME_CSS, unsafe_allow_html=True)
 
-# Remove top padding and hide header/footer
+# Remove top padding and hide header/footer + mobile responsive styling
 st.markdown("""
 <style>
     header {display: none;}
     footer {display: none;}
     [data-testid="stToolbar"] {display: none;}
     [data-testid="stDecoration"] {display: none;}
-    .reportview-container .main .block-container {{max-width: 100%;}}
+    .reportview-container .main .block-container {max-width: 100%;}
+    
+    /* Mobile responsive header */
+    @media (max-width: 768px) {
+        .branding-header {padding: 30px 15px !important; margin: 20px 0;}
+        .branding-header h1 {font-size: 2em !important;}
+        .branding-header p {font-size: 0.9em !important;}
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # Header with GreenGrowth branding
 st.markdown("""
-<div style='background: #2d2d2d; padding: 50px 30px; border-radius: 12px; text-align: center; margin-bottom: 40px; border: 2px solid #7bff50;'>
+<div class='branding-header' style='background: #2d2d2d; padding: 50px 30px; border-radius: 12px; text-align: center; margin-bottom: 40px; border: 2px solid #7bff50;'>
     <div style='font-size: 3em; margin-bottom: 15px;'>🌱</div>
     <h1 style='color: #7bff50; font-size: 2.8em; margin-bottom: 10px; font-weight: 900;'>GreenGrowth CPAs</h1>
     <p style='color: #d0d0d0; font-size: 1.2em; margin-bottom: 5px;'>Leading CPA Firm Offering Expert Tax, Audit & Financial Services</p>

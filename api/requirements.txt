@@ -21,4 +21,4 @@ Pillow
 reportlab
 # Donut - Document Understanding Transformer for tax form extraction
 transformers>=4.25.0
-torch>=2.0.0
+torch==2.0.0
