@@ -1,6 +1,7 @@
 import streamlit as st
 from utils.state import init_session_state
 from utils.styles import DARK_THEME_CSS
+from utils.sidebar_toggle import add_mobile_sidebar_toggle
 
 st.set_page_config(
     page_title="IRS Information",
@@ -11,6 +12,9 @@ st.set_page_config(
 init_session_state()
 
 st.markdown(DARK_THEME_CSS, unsafe_allow_html=True)
+
+# Add mobile sidebar toggle
+add_mobile_sidebar_toggle()
 
 st.markdown("<h1 style='background: #1a1f3a; color: white !important; text-align: center; padding: 20px; border-radius: 8px; margin: 0; border: 2px solid #ff6b6b; text-shadow: 1px 1px 2px rgba(0,0,0,0.3);'>IRS INFORMATION & RESOURCES</h1>", unsafe_allow_html=True)
 st.markdown("<p style='color: #ff6b6b !important; text-align: center; opacity: 0.9; font-size: 0.95em;'>Comprehensive Guide to IRS Services, Forms & Tax Information</p>", unsafe_allow_html=True)

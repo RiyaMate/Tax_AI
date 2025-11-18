@@ -10,10 +10,46 @@ DARK_THEME_CSS = """<style>
         box-sizing: border-box;
     }
     
-    /* Hide deploy button and toolbar */
+    /* Hide Streamlit default toolbar but keep hamburger button visible */
     [data-testid="stToolbar"] {display: none !important;}
-    [data-testid="stDecoration"] {display: none !important;}
-    .stDeployButton {display: none !important;}
+    
+    /* Make hamburger/collapse button always visible and prominent on mobile */
+    button[kind="header"] {
+        position: fixed !important;
+        top: 10px !important;
+        left: 10px !important;
+        z-index: 1001 !important;
+        width: 48px !important;
+        height: 48px !important;
+        min-width: 48px !important;
+        min-height: 48px !important;
+        padding: 8px !important;
+        background: rgba(16, 185, 129, 0.9) !important;
+        border: 2px solid #10b981 !important;
+        border-radius: 8px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        cursor: pointer !important;
+        transition: all 0.3s ease !important;
+    }
+    
+    button[kind="header"]:hover {
+        background: rgba(16, 185, 129, 1) !important;
+        transform: scale(1.05) !important;
+        box-shadow: 0 0 15px rgba(16, 185, 129, 0.5) !important;
+    }
+    
+    button[kind="header"]:active {
+        transform: scale(0.95) !important;
+    }
+    
+    button[kind="header"] svg {
+        width: 24px !important;
+        height: 24px !important;
+        stroke: white !important;
+        stroke-width: 2 !important;
+    }
     
     /* Hide loading skeletons and spinners */
     [data-testid="stElementContainer"] > div > div > div {
@@ -482,6 +518,7 @@ DARK_THEME_CSS = """<style>
             padding-top: 1rem !important;
             padding-bottom: 1rem !important;
             max-width: 100% !important;
+            margin-top: 50px !important;
         }
         
         /* Responsive headers */
@@ -607,51 +644,12 @@ DARK_THEME_CSS = """<style>
             left: 0 !important;
             top: 0 !important;
             height: 100vh !important;
-            z-index: 999999 !important;
+            z-index: 999 !important;
             background: #0f0f0f !important;
             border-right: 2px solid #10b981 !important;
             overflow-y: auto !important;
             padding: 1rem 0 !important;
             transition: all 0.3s ease-in-out !important;
-            animation: slideInLeft 0.3s ease-in-out !important;
-        }
-        
-        /* Smooth slide-in animation for sidebar */
-        @keyframes slideInLeft {
-            from {
-                transform: translateX(-100%) !important;
-                opacity: 0 !important;
-            }
-            to {
-                transform: translateX(0) !important;
-                opacity: 1 !important;
-            }
-        }
-        
-        /* Hamburger menu close button on mobile */
-        [data-testid="stSidebar"] [data-testid="collapsedControl"] {
-            position: fixed !important;
-            top: 12px !important;
-            left: 12px !important;
-            z-index: 1000001 !important;
-            background: rgba(16, 185, 129, 0.2) !important;
-            border: 2px solid #10b981 !important;
-            border-radius: 8px !important;
-            padding: 10px 12px !important;
-            cursor: pointer !important;
-            transition: all 0.2s ease !important;
-            width: 48px !important;
-            height: 48px !important;
-            min-width: 48px !important;
-            min-height: 48px !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            touch-action: manipulation !important;
-        }
-        [data-testid="stSidebar"] [data-testid="collapsedControl"]:active {
-            background: rgba(16, 185, 129, 0.4) !important;
-            transform: scale(0.95) !important;
         }
         
         [data-testid="stSidebar"] [data-testid="stPageLink-NavLink"] {
@@ -764,6 +762,24 @@ DARK_THEME_CSS = """<style>
         [data-testid="stForm"] > div {
             width: 100% !important;
         }
+        
+        /* Make hamburger button very visible on mobile */
+        button[kind="header"] {
+            position: fixed !important;
+            top: 10px !important;
+            left: 10px !important;
+            width: 50px !important;
+            height: 50px !important;
+            min-width: 50px !important;
+            min-height: 50px !important;
+            background: #10b981 !important;
+            border: 2px solid white !important;
+            z-index: 1001 !important;
+            border-radius: 8px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
     }
     
     /* ===============================================================
@@ -787,6 +803,7 @@ DARK_THEME_CSS = """<style>
         .block-container {
             padding-left: 0.5rem !important;
             padding-right: 0.5rem !important;
+            padding-top: 60px !important;
         }
         
         /* Buttons more touchable */
@@ -835,6 +852,9 @@ DARK_THEME_CSS = """<style>
             top: 0 !important;
             height: 100vh !important;
             padding: 2rem 0 1rem 0 !important;
+            z-index: 999 !important;
+            overflow-y: auto !important;
+            background: #0f0f0f !important;
         }
         
         [data-testid="stSidebar"] [data-testid="stPageLink-NavLink"] {
@@ -842,6 +862,20 @@ DARK_THEME_CSS = """<style>
             padding: 14px 10px !important;
             margin: 6px 10px !important;
             font-size: 0.9em !important;
+        }
+        
+        /* Make hamburger button extremely visible on small mobile */
+        button[kind="header"] {
+            position: fixed !important;
+            top: 8px !important;
+            left: 8px !important;
+            width: 52px !important;
+            height: 52px !important;
+            min-width: 52px !important;
+            min-height: 52px !important;
+            background: #10b981 !important;
+            border: 3px solid white !important;
+            z-index: 1001 !important;
         }
     }
     

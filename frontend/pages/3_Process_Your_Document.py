@@ -8,6 +8,7 @@ from pathlib import Path
 from utils.state import init_session_state
 from utils.landingai_utils import landingai_parse
 from utils.styles import DARK_THEME_CSS
+from utils.sidebar_toggle import add_mobile_sidebar_toggle
 from utils.validation_display import display_extraction_summary, create_validation_report
 
 # Set page config for mobile
@@ -21,6 +22,9 @@ init_session_state()
 
 # Apply shared dark theme
 st.markdown(DARK_THEME_CSS, unsafe_allow_html=True)
+
+# Add mobile sidebar toggle
+add_mobile_sidebar_toggle()
 
 st.markdown("<h1 style='background: #1a1f3a; color: white !important; text-align: center; padding: 20px; border-radius: 8px; margin: 0; border: 2px solid #10b981; text-shadow: 1px 1px 2px rgba(0,0,0,0.3);'>📄 PROCESS YOUR DOCUMENT</h1>", unsafe_allow_html=True)
 st.markdown("<p style='color: #10b981 !important; text-align: center; opacity: 0.9; font-size: 0.95em;'>Upload and parse your tax documents with AI</p>", unsafe_allow_html=True)
