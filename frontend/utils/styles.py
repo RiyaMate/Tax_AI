@@ -61,6 +61,7 @@ DARK_THEME_CSS = """<style>
         box-shadow: 2px 0 20px rgba(16, 185, 129, 0.15) !important;
         min-width: 250px !important;
         max-width: 300px !important;
+        transition: all 0.3s ease-in-out !important;
     }
     [data-testid="stSidebar"] > div:first-child {
         background: #0f0f0f !important;
@@ -68,10 +69,12 @@ DARK_THEME_CSS = """<style>
         display: flex !important;
         flex-direction: column !important;
         min-height: 100vh !important;
+        transition: all 0.3s ease-in-out !important;
     }
     [data-testid="stSidebar"] > div {
         background: #0f0f0f !important;
         width: 100% !important;
+        transition: all 0.3s ease-in-out !important;
     }
     
     /* Sidebar text */
@@ -609,10 +612,51 @@ DARK_THEME_CSS = """<style>
             border-right: 2px solid #10b981 !important;
             overflow-y: auto !important;
             padding: 1rem 0 !important;
+            transition: all 0.3s ease-in-out !important;
+            animation: slideInLeft 0.3s ease-in-out !important;
+        }
+        
+        /* Smooth slide-in animation for sidebar */
+        @keyframes slideInLeft {
+            from {
+                transform: translateX(-100%) !important;
+                opacity: 0 !important;
+            }
+            to {
+                transform: translateX(0) !important;
+                opacity: 1 !important;
+            }
+        }
+        
+        /* Hamburger menu close button on mobile */
+        [data-testid="stSidebar"] [data-testid="collapsedControl"] {
+            position: fixed !important;
+            top: 12px !important;
+            left: 12px !important;
+            z-index: 1000001 !important;
+            background: rgba(16, 185, 129, 0.2) !important;
+            border: 2px solid #10b981 !important;
+            border-radius: 8px !important;
+            padding: 10px 12px !important;
+            cursor: pointer !important;
+            transition: all 0.2s ease !important;
+            width: 48px !important;
+            height: 48px !important;
+            min-width: 48px !important;
+            min-height: 48px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            touch-action: manipulation !important;
+        }
+        [data-testid="stSidebar"] [data-testid="collapsedControl"]:active {
+            background: rgba(16, 185, 129, 0.4) !important;
+            transform: scale(0.95) !important;
         }
         
         [data-testid="stSidebar"] [data-testid="stPageLink-NavLink"] {
-            display: block !important;
+            display: flex !important;
+            align-items: center !important;
             width: calc(100% - 24px) !important;
             padding: 16px 12px !important;
             margin: 8px 12px !important;
@@ -622,13 +666,24 @@ DARK_THEME_CSS = """<style>
             color: #cbd5e1 !important;
             text-align: left !important;
             border: none !important;
-            transition: all 0.3s ease !important;
+            transition: all 0.2s ease !important;
+            min-height: 48px !important;
+            user-select: none !important;
+            -webkit-user-select: none !important;
+            cursor: pointer !important;
+            touch-action: manipulation !important;
         }
         
         [data-testid="stSidebar"] [data-testid="stPageLink-NavLink"]:hover {
             background: rgba(16, 185, 129, 0.2) !important;
             color: #10b981 !important;
             transform: translateX(4px) !important;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15) !important;
+        }
+        
+        [data-testid="stSidebar"] [data-testid="stPageLink-NavLink"]:active {
+            transform: translateX(2px) scale(0.98) !important;
+            background: rgba(16, 185, 129, 0.25) !important;
         }
         
         [data-testid="stSidebar"] [data-testid="stPageLink-NavLink"][aria-current="page"] {
@@ -636,6 +691,8 @@ DARK_THEME_CSS = """<style>
             color: #10b981 !important;
             font-weight: 600 !important;
             box-shadow: inset 0 0 15px rgba(16, 185, 129, 0.1) !important;
+            border-left: 3px solid #10b981 !important;
+            padding-left: 9px !important;
         }
         
         /* Expander - mobile friendly */
