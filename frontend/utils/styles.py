@@ -13,42 +13,50 @@ DARK_THEME_CSS = """<style>
     /* Hide Streamlit default toolbar but keep hamburger button visible */
     [data-testid="stToolbar"] {display: none !important;}
     
-    /* Make hamburger/collapse button always visible and prominent on mobile */
+    /* Hide Streamlit's default header button on desktop (we have custom one) */
     button[kind="header"] {
-        position: fixed !important;
-        top: 10px !important;
-        left: 10px !important;
-        z-index: 1001 !important;
-        width: 48px !important;
-        height: 48px !important;
-        min-width: 48px !important;
-        min-height: 48px !important;
-        padding: 8px !important;
-        background: rgba(16, 185, 129, 0.9) !important;
-        border: 2px solid #10b981 !important;
-        border-radius: 8px !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        cursor: pointer !important;
-        transition: all 0.3s ease !important;
+        display: none !important;
     }
     
-    button[kind="header"]:hover {
-        background: rgba(16, 185, 129, 1) !important;
-        transform: scale(1.05) !important;
-        box-shadow: 0 0 15px rgba(16, 185, 129, 0.5) !important;
-    }
-    
-    button[kind="header"]:active {
-        transform: scale(0.95) !important;
-    }
-    
-    button[kind="header"] svg {
-        width: 24px !important;
-        height: 24px !important;
-        stroke: white !important;
-        stroke-width: 2 !important;
+    /* Show Streamlit's default header button only on small mobile */
+    @media (max-width: 600px) {
+        button[kind="header"] {
+            position: fixed !important;
+            top: 12px !important;
+            left: 12px !important;
+            z-index: 1001 !important;
+            width: 48px !important;
+            height: 48px !important;
+            min-width: 48px !important;
+            min-height: 48px !important;
+            padding: 8px !important;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+            border: 2px solid #10b981 !important;
+            border-radius: 8px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            cursor: pointer !important;
+            transition: all 0.3s ease !important;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4) !important;
+        }
+        
+        button[kind="header"]:hover {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
+            transform: scale(1.05) !important;
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.5) !important;
+        }
+        
+        button[kind="header"]:active {
+            transform: scale(0.92) !important;
+        }
+        
+        button[kind="header"] svg {
+            width: 24px !important;
+            height: 24px !important;
+            stroke: white !important;
+            stroke-width: 2 !important;
+        }
     }
     
     /* Hide loading skeletons and spinners */

@@ -36,7 +36,7 @@ st.markdown("""
         color: white;
         font-size: 24px;
         font-weight: bold;
-        display: none;
+        display: flex;
         align-items: center;
         justify-content: center;
         transition: all 0.3s ease;
@@ -53,13 +53,6 @@ st.markdown("""
     
     .sidebar-toggle-btn:active {
         transform: scale(0.92);
-    }
-    
-    /* Show on mobile and tablet */
-    @media (max-width: 1024px) {
-        .sidebar-toggle-btn {
-            display: flex !important;
-        }
     }
 </style>
 
