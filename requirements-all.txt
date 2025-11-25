@@ -45,7 +45,7 @@ camelot-py[cv]>=0.11.0
 pytesseract>=0.3.13
 Pillow>=9.0.0
 transformers>=4.25.0
-torch>=2.0.0
+torch==2.0.0
 google-cloud-storage>=2.10.0
 async-timeout>=4.0.0
 apify-client>=1.9.2

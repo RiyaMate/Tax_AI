@@ -51,6 +51,13 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 load_dotenv(override=True)
 
+# Import document field schema for intelligent extraction
+try:
+    from document_field_schema import DocumentFieldSchema, get_available_fields_for_document
+    FIELD_SCHEMA_AVAILABLE = True
+except ImportError:
+    FIELD_SCHEMA_AVAILABLE = False
+
 
 class DocumentType(str, Enum):
     """Supported tax form types"""
@@ -59,6 +66,11 @@ class DocumentType(str, Enum):
     FORM_1099_INT = "1099-INT"
     FORM_1099_DIV = "1099-DIV"
     FORM_1099_B = "1099-B"
+    FORM_1099_MISC = "1099-MISC"
+    FORM_1099_K = "1099-K"
+    FORM_1099_OID = "1099-OID"
+    FORM_1098 = "1098"
+    FORM_1098_T = "1098-T"
     PAYSTUB = "Paystub"
     BANK_STATEMENT = "Bank Statement"
     UNKNOWN = "UNKNOWN"
@@ -77,50 +89,125 @@ def detect_document_type(text: str) -> DocumentType:
     """
     FLEXIBLE document type detection that works with ANY format.
     Handles HTML, JSON, Markdown, plain text, OCR output, mixed formats.
+    IMPROVED: Better encoding handling, smarter fallback, OCR error tolerance.
     """
+    import html
+    import re
+    
     text_lower = text.lower()
     
-    # Remove HTML/JSON noise for cleaner detection
-    text_clean = text_lower.replace("<", " ").replace(">", " ").replace('"', " ")
+    # STEP 1: Decode HTML entities (e.g., "1099&#8212;MISC" -> "1099-MISC")
+    try:
+        text_decoded = html.unescape(text_lower)
+    except:
+        text_decoded = text_lower
     
-    # W-2 indicators (multiple keywords for robustness)
-    w2_keywords = ["w-2", "wage and tax", "box 1", "wages", "employer", "withholding"]
-    w2_count = sum(1 for kw in w2_keywords if kw in text_clean)
-    if w2_count >= 2 or "w-2" in text_clean or ("box 1" in text_clean and "wages" in text_clean):
+    # STEP 2: Normalize dashes (handle en-dash, em-dash, minus sign)
+    # Replace: – (en-dash U+2013), — (em-dash U+2014), − (minus U+2212), _ (underscore)
+    text_normalized = text_decoded.replace('–', '-').replace('—', '-').replace('−', '-').replace('_', '-')
+    
+    # STEP 3: Clean HTML/JSON noise
+    text_clean = text_normalized.replace("<", " ").replace(">", " ").replace('"', " ").replace('&', ' ')
+    
+    # STEP 4: Create variant patterns for OCR tolerance (0/O, l/1 confusion)
+    def has_keyword_or_variants(text, base_keyword):
+        """Check if keyword or OCR-error variants exist"""
+        if base_keyword in text:
+            return True
+        # Handle common OCR mistakes: 0->O, l->1, 5->S
+        variant1 = base_keyword.replace('0', 'o')  # Allow letter O instead of 0
+        if variant1 in text:
+            return True
+        return False
+    
+    # 1099-MISC indicators (CHECK FIRST - BEFORE W-2 to prevent false positives)
+    # MUST check BEFORE 1099-NEC since MISC can also mention nonemployee compensation in Box 7
+    misc_keywords = ["1099-misc", "1099 misc", "1099misc", "miscellaneous income", "royalties", "rents", "prizes", "awards", "box 7 nonemployee", "fishing boat", "medical payments"]
+    if any(has_keyword_or_variants(text_clean, kw) for kw in misc_keywords):
+        return DocumentType.FORM_1099_MISC
+    
+    # Alternative check: Look for "1099" followed by "misc" anywhere in text (handles encoding issues)
+    if re.search(r'1099\s*[-\s]*misc', text_clean, re.IGNORECASE):
+        return DocumentType.FORM_1099_MISC
+    
+    # W-2 indicators (AFTER 1099-MISC to avoid confusion)
+    # Require explicit "w-2" or "wage and tax" to avoid false positives from 1099 forms that mention "box" or "wages"
+    w2_keywords = ["w-2", "wage and tax statement", "employee's withholding"]
+    if any(has_keyword_or_variants(text_clean, kw) for kw in w2_keywords):
         return DocumentType.W2
     
-    # 1099-NEC indicators
+    # 1099-NEC indicators (after MISC check to avoid false positives)
     nec_keywords = ["1099-nec", "1099 nec", "1099nec", "nonemployee compensation", "nec form"]
-    if any(kw in text_clean for kw in nec_keywords):
+    if any(has_keyword_or_variants(text_clean, kw) for kw in nec_keywords):
         return DocumentType.FORM_1099_NEC
     
     # 1099-INT indicators
     int_keywords = ["1099-int", "1099 int", "1099int", "interest income", "interest paid"]
-    if any(kw in text_clean for kw in int_keywords):
+    if any(has_keyword_or_variants(text_clean, kw) for kw in int_keywords):
         return DocumentType.FORM_1099_INT
     
     # 1099-DIV indicators
     div_keywords = ["1099-div", "1099 div", "1099div", "dividend", "distributed"]
-    if any(kw in text_clean for kw in div_keywords):
+    if any(has_keyword_or_variants(text_clean, kw) for kw in div_keywords):
         return DocumentType.FORM_1099_DIV
     
     # 1099-B indicators
-    b_keywords = ["1099-b", "1099 b", "1099b", "proceeds", "sale securities"]
-    if any(kw in text_clean for kw in b_keywords):
+    b_keywords = ["1099-b", "1099 b", "1099b", "proceeds", "sale securities", "brokerage"]
+    if any(has_keyword_or_variants(text_clean, kw) for kw in b_keywords):
         return DocumentType.FORM_1099_B
+    
+    # 1099-K indicators (Payment card)
+    k_keywords = ["1099-k", "1099 k", "1099k", "payment card", "merchant category"]
+    if any(has_keyword_or_variants(text_clean, kw) for kw in k_keywords):
+        return DocumentType.FORM_1099_K
+    
+    # 1099-OID indicators (Original Issue Discount)
+    oid_keywords = ["1099-oid", "1099 oid", "1099oid", "original issue discount"]
+    if any(has_keyword_or_variants(text_clean, kw) for kw in oid_keywords):
+        return DocumentType.FORM_1099_OID
+    
+    # 1098-T indicators (Education credit)
+    t_keywords = ["1098-t", "1098 t", "1098t", "education", "qualified education"]
+    if any(has_keyword_or_variants(text_clean, kw) for kw in t_keywords):
+        return DocumentType.FORM_1098_T
+    
+    # 1098 indicators (Mortgage interest)
+    m1098_keywords = ["1098 ", "mortgage interest statement", "box 1 mortgage"]
+    if any(has_keyword_or_variants(text_clean, kw) for kw in m1098_keywords) and "1098-t" not in text_clean:
+        return DocumentType.FORM_1098
     
     # Paystub indicators
     paystub_keywords = ["paystub", "pay stub", "paycheck", "gross pay", "net pay", "employer deduction"]
-    if any(kw in text_clean for kw in paystub_keywords):
+    if any(has_keyword_or_variants(text_clean, kw) for kw in paystub_keywords):
         return DocumentType.PAYSTUB
     
     # Bank statement indicators
     bank_keywords = ["bank statement", "account statement", "transaction", "balance"]
-    if any(kw in text_clean for kw in bank_keywords):
+    if any(has_keyword_or_variants(text_clean, kw) for kw in bank_keywords):
         return DocumentType.BANK_STATEMENT
     
-    # Default: if it looks like a tax form, assume W-2
-    if any(kw in text_clean for kw in ["box", "form", "employee", "income", "tax"]):
+    # Fallback: if it looks like a 1099 form specifically
+    if has_keyword_or_variants(text_clean, "1099"):
+        # IMPROVED FALLBACK: Smart detection instead of defaulting to NEC
+        if has_keyword_or_variants(text_clean, "misc") or has_keyword_or_variants(text_clean, "royalties"):
+            return DocumentType.FORM_1099_MISC
+        elif has_keyword_or_variants(text_clean, "payment") and has_keyword_or_variants(text_clean, "card"):
+            return DocumentType.FORM_1099_K
+        elif has_keyword_or_variants(text_clean, "proceeds") or has_keyword_or_variants(text_clean, "brokerage"):
+            return DocumentType.FORM_1099_B
+        elif has_keyword_or_variants(text_clean, "interest"):
+            return DocumentType.FORM_1099_INT
+        elif has_keyword_or_variants(text_clean, "dividend"):
+            return DocumentType.FORM_1099_DIV
+        elif has_keyword_or_variants(text_clean, "original") and has_keyword_or_variants(text_clean, "discount"):
+            return DocumentType.FORM_1099_OID
+        else:
+            # Last resort: Default to NEC for truly unknown 1099s
+            return DocumentType.FORM_1099_NEC
+    
+    # Default: if it looks like a tax form, assume W-2 ONLY if it explicitly mentions W-2
+    # (Don't use generic keywords - they match too many documents)
+    if any(has_keyword_or_variants(text_clean, kw) for kw in ["w-2", "form w", "wage and tax"]):
         return DocumentType.W2
     
     return DocumentType.UNKNOWN
@@ -288,55 +375,73 @@ class LLMTaxExtractor:
     def _build_extraction_prompt(self, text: str, doc_type: DocumentType) -> str:
         """
         Build a FLEXIBLE extraction prompt that accepts ANY format of LandingAI output.
+        ENHANCED: Uses document field schema to tell LLM exactly what fields exist.
         Extracts using LandingAI field names (not Box numbers).
         Handles: HTML tables, Markdown, JSON, plain text, OCR, mixed formats.
         No preprocessing needed - works with raw LandingAI output in any format.
         """
-        # Define LandingAI field names by document type
-        if doc_type == DocumentType.W2:
-            field_names = """
-LANDINGAI FIELD NAMES FOR W-2:
-- wages (W-2 Box 1: Wages, tips, other compensation)
-- federal_income_tax_withheld (W-2 Box 2: Federal income tax withheld)
-- social_security_wages (W-2 Box 3: Social Security wages)
-- social_security_tax_withheld (W-2 Box 4: Social Security tax withheld)
-- medicare_wages (W-2 Box 5: Medicare wages and tips)
-- medicare_tax_withheld (W-2 Box 6: Medicare tax withheld)
-- state_income_tax_withheld (W-2 Box 19: State income tax)
+        # Sanitize text to ensure UTF-8 compatibility (handle special Unicode characters)
+        # This prevents charmap encoding errors when passing to LLM
+        sanitized_text = text.encode('utf-8', errors='replace').decode('utf-8', errors='replace')
+        
+        # Get field schema for this document type (ENHANCED: tells LLM what fields to extract)
+        field_list_prompt = ""
+        if FIELD_SCHEMA_AVAILABLE:
+            try:
+                field_list_prompt = get_available_fields_for_document(doc_type)
+            except Exception as e:
+                print(f"[WARN] Could not load field schema: {e}")
+                field_list_prompt = ""
+        
+        # Fallback to basic field names if schema not available
+        if not field_list_prompt:
+            if doc_type == DocumentType.W2:
+                field_names = """
+AVAILABLE FIELDS FOR W-2:
+- wages (Box 1: Wages, tips, other compensation)
+- federal_income_tax_withheld (Box 2: Federal income tax withheld)
+- social_security_wages (Box 3: Social Security wages)
+- social_security_tax_withheld (Box 4: Social Security tax withheld)
+- medicare_wages (Box 5: Medicare wages and tips)
+- medicare_tax_withheld (Box 6: Medicare tax withheld)
+- state_income_tax_withheld (Box 19: State income tax)
 - employer_ein, employer_name, employer_address
 - employee_ssn, employee_name, employee_address
 """
-        elif doc_type == DocumentType.FORM_1099_NEC:
-            field_names = """
-LANDINGAI FIELD NAMES FOR 1099-NEC:
+            elif doc_type == DocumentType.FORM_1099_NEC:
+                field_names = """
+AVAILABLE FIELDS FOR 1099-NEC:
 - nonemployee_compensation (Box 1: Nonemployee Compensation)
 - federal_income_tax_withheld (Box 4: Federal income tax withheld)
 - payer_name, payer_ein, payer_address
 - recipient_tin, recipient_name
 """
-        elif doc_type == DocumentType.FORM_1099_INT:
-            field_names = """
-LANDINGAI FIELD NAMES FOR 1099-INT:
+            elif doc_type == DocumentType.FORM_1099_INT:
+                field_names = """
+AVAILABLE FIELDS FOR 1099-INT:
 - interest_income (Box 1: Interest Income)
 - federal_income_tax_withheld (Box 4: Federal income tax withheld)
 - payer_name, payer_tin, payer_address
 - recipient_tin, recipient_name
 """
-        else:
-            field_names = """
-LANDINGAI FIELD NAMES (UNIVERSAL):
+            else:
+                field_names = """
+AVAILABLE FIELDS (UNIVERSAL):
 - wages, nonemployee_compensation, interest_income, dividend_income
 - federal_income_tax_withheld, state_income_tax_withheld, local_income_tax_withheld
 - social_security_wages, social_security_tax_withheld
 - medicare_wages, medicare_tax_withheld
 """
+        else:
+            field_names = field_list_prompt
         
-        prompt = f"""You are a UNIVERSAL DATA EXTRACTOR for tax documents using LandingAI field names.
+        prompt = f"""You are a UNIVERSAL DATA EXTRACTOR for tax documents.
 
 YOUR JOB:
-1. ACCEPT the input in ANY format (HTML, JSON, Markdown, text, OCR, tables, mixed)
-2. EXTRACT tax data and MAP to LandingAI field names (NOT Box numbers)
-3. RETURN clean JSON with all extracted fields
+1. Read the document in ANY format (HTML, JSON, Markdown, text, OCR, tables, mixed)
+2. Extract ALL available fields from the list below
+3. Map extracted data to the exact field names shown
+4. Return clean JSON with all extracted values
 
 DOCUMENT TYPE: {doc_type.value}
 
@@ -346,34 +451,31 @@ INPUT FORMAT HANDLING:
 - HTML tables: <tr><td>Wages</td><td>23500</td></tr> → "wages": 23500
 - Markdown tables: | Wages | 23500 | → "wages": 23500
 - JSON objects: {{"wages": 23500}} → "wages": 23500
-- Box notation: "Box 1: $23,500" → Map to "wages": 23500
+- Box notation: "Box 1: $23,500" → Map to correct field name
 - Label: Value format: "Wages: $23,500.00" → "wages": 23500.00
-- Plain text/OCR: "Wages 23500 Federal tax 1500" → infer and map fields
+- Plain text/OCR: "Wages 23500 Federal tax 1500" → extract and map fields
 - Mixed formats: Handle all above simultaneously
 
 EXTRACTION RULES:
-1. Convert ALL formats to LandingAI field names (use field names, NOT Box numbers)
+1. ONLY use field names from the AVAILABLE FIELDS list above
 2. Handle currency ($€¥), commas (23,500), decimals (340.75)
 3. Extract names/IDs (SSN/EIN/TIN) as text values
 4. For tables: column headers = labels, cells = values → map to field names
 5. For JSON: flatten nested structures if needed
-6. For OCR/text: infer field names and map to LandingAI names
-7. Do NOT skip values - extract everything
+6. For OCR/text: infer field names and map to correct field names
+7. Do NOT skip values - extract everything possible
 8. Clean labels: remove special chars, normalize spacing
+9. If a field is NOT in the list above, DO NOT include it in output
 
-OUTPUT FORMAT (ALWAYS return this JSON structure with LandingAI field names):
+OUTPUT FORMAT (ALWAYS return ONLY JSON with raw_fields containing field values):
 {{
   "extraction_method": "llm_universal",
   "provider": "{self.provider.value}",
   "document_type": "{doc_type.value}",
   "input_format_detected": "auto-detected",
   "raw_fields": {{
-    "wages": 23500.00,
-    "federal_income_tax_withheld": 1500.00,
-    "social_security_wages": 23500.00,
-    "medicare_tax_withheld": 340.75,
-    "employee_name": "John Doe",
-    "employee_ssn": "123-45-6789"
+    "field_name_1": value_or_text,
+    "field_name_2": value_or_text
   }},
   "field_count": 6,
   "extraction_complete": true
@@ -381,10 +483,10 @@ OUTPUT FORMAT (ALWAYS return this JSON structure with LandingAI field names):
 
 DOCUMENT INPUT (ANY FORMAT - NO PREPROCESSING NEEDED):
 ===START===
-{text}
+{sanitized_text}
 ===END===
 
-NOW EXTRACT: Read any format, map to LandingAI field names, return ONLY JSON with raw_fields filled.
+NOW EXTRACT: Read the document above. Extract ONLY fields from the AVAILABLE FIELDS list. Return ONLY JSON.
 """
         return prompt
     
@@ -392,6 +494,13 @@ NOW EXTRACT: Read any format, map to LandingAI field names, return ONLY JSON wit
         """Call the LLM with the prompt"""
         
         try:
+            # Ensure prompt is properly encoded (handle Unicode characters like em-dashes)
+            if isinstance(prompt, bytes):
+                prompt = prompt.decode('utf-8', errors='replace')
+            else:
+                # Force UTF-8 encoding to handle special characters
+                prompt = prompt.encode('utf-8', errors='replace').decode('utf-8')
+            
             if self.provider == LLMProvider.GEMINI:
                 response = self.client.generate_content(prompt)
                 return response.text
@@ -732,7 +841,7 @@ class UniversalLLMTaxAgent:
         # Step 6: Validate normalized fields
         normalization_validation = self._validate_normalized_fields(normalized, doc_type)
         
-        # Step 7: Run tax calculation
+        # Step 7: Run tax calculation for ALL document types
         result = {
             "document_type": doc_type.value,
             "extraction": extraction,
@@ -749,8 +858,16 @@ class UniversalLLMTaxAgent:
             "accuracy_score": audit_report["confidence_score"],  # 0-1, where 1 = perfect accuracy
         }
         
-        if self.tax_engine_available and doc_type == DocumentType.W2:
-            print(f"[INFO] Running tax calculation...")
+        # Run tax calculation for ALL supported forms, not just W-2
+        if self.tax_engine_available and doc_type in [
+            DocumentType.W2, 
+            DocumentType.FORM_1099_NEC,
+            DocumentType.FORM_1099_MISC,
+            DocumentType.FORM_1099_INT,
+            DocumentType.FORM_1099_DIV,
+            DocumentType.FORM_1099_K,
+        ]:
+            print(f"[INFO] Running tax calculation for {doc_type.value}...")
             try:
                 # Prepare documents for tax calculation
                 docs = [normalized]
@@ -892,9 +1009,13 @@ class UniversalLLMTaxAgent:
         }
         
         for field, value in normalized.items():
-            if value > 0:
-                validation["fields_with_values"] += 1
-            else:
+            try:
+                val_num = float(value) if isinstance(value, str) else value
+                if isinstance(val_num, (int, float)) and val_num > 0:
+                    validation["fields_with_values"] += 1
+                else:
+                    validation["fields_with_zero"] += 1
+            except (ValueError, TypeError):
                 validation["fields_with_zero"] += 1
         
         validation["summary"] = {
@@ -947,10 +1068,63 @@ class UniversalLLMTaxAgent:
         normalized = {
             "wages": 0.0,
             "nonemployee_compensation": 0.0,
-            "interest_income": 0.0,
+            
+            # 1099-MISC fields (all boxes)
+            "rents": 0.0,                           # Box 1
+            "royalties": 0.0,                       # Box 2
+            "other_income": 0.0,                    # Box 3
+            "fishing_boat_proceeds": 0.0,           # Box 5
+            "medical_payments": 0.0,                # Box 6
+            "substitute_payments": 0.0,             # Box 8
+            "crop_insurance_proceeds": 0.0,         # Box 9
+            "gross_proceeds_attorney": 0.0,         # Box 10
+            "excess_parachute_payments": 0.0,       # Box 14
+            "nonqualified_deferred_comp": 0.0,      # Box 15
+            
+            # 1099-INT fields
+            "interest_income": 0.0,                 # Box 1
+            "us_savings_bonds": 0.0,                # Box 3
+            "federal_interest_subsidy": 0.0,        # Box 4
+            
+            # 1099-DIV fields
+            "ordinary_dividends": 0.0,              # Box 1a
+            "qualified_dividends": 0.0,             # Box 1b
+            "capital_gain_distributions": 0.0,      # Box 2a
+            "long_term_capital_gains": 0.0,         # Box 2b
+            "unrecaptured_section_1250": 0.0,       # Box 2d
+            "section_1202_gains": 0.0,              # Box 2e
+            "collectibles_gains": 0.0,              # Box 2f
+            "nondividend_distributions": 0.0,       # Box 3
+            "federal_income_tax_withheld": 0.0,     # Box 4
+            "investment_expenses": 0.0,             # Box 5
+            "foreign_tax_paid": 0.0,                # Box 7
+            "foreign_country": "",                  # Box 8
+            
+            # 1099-B fields (Brokerage/Securities)
+            "total_proceeds": 0.0,                  # Box 1d
+            "cost_basis": 0.0,                      # Box 1e
+            "adjustment_code": "",                 # Box 1f
+            "gain_or_loss": 0.0,                    # Box 1g
+            "short_term_gains": 0.0,                # Short-term gains
+            "long_term_gains": 0.0,                 # Long-term gains
+            
+            # 1099-K fields (Payment Card/Third Party)
+            "card_not_present_transactions": 0.0,   # Box 1a
+            "merchant_category_code": "",          # Box 1b
+            "monthly_payment_transactions": [],     # Boxes 5a-5m
+            "federal_income_tax_withheld_k": 0.0,   # Box 4
+            
+            # 1099-OID fields (Original Issue Discount)
+            "original_issue_discount": 0.0,         # Box 1a
+            "oid_from_call_redemption": 0.0,        # Box 1b
+            "early_redemption": 0.0,                # Box 2
+            "oid_accrued_this_year": 0.0,           # Box 3
+            
+            # 1099-INT/DIV/etc (consolidated)
             "dividend_income": 0.0,
             "capital_gains": 0.0,
-            "federal_income_tax_withheld": 0.0,
+            
+            # Withholdings
             "social_security_wages": 0.0,
             "social_security_tax_withheld": 0.0,
             "medicare_wages": 0.0,
@@ -1001,6 +1175,59 @@ class UniversalLLMTaxAgent:
             (("dividend", "income"), "dividend_income", 10),
             (("dividends",), "dividend_income", 10),
             (("capital", "gain"), "capital_gains", 10),
+            
+            # PRIORITY 9: 1099-MISC box numbers
+            (("box 1",), "rents", 15),              # 1099-MISC Box 1
+            (("box 2",), "royalties", 15),          # 1099-MISC Box 2
+            (("box 3",), "other_income", 15),       # 1099-MISC Box 3
+            (("box 5",), "fishing_boat_proceeds", 15), # 1099-MISC Box 5
+            (("box 6",), "medical_payments", 15),   # 1099-MISC Box 6
+            (("box 8",), "substitute_payments", 15), # 1099-MISC Box 8
+            (("box 9",), "crop_insurance_proceeds", 15), # 1099-MISC Box 9
+            (("box 10",), "gross_proceeds_attorney", 15), # 1099-MISC Box 10
+            (("box 14",), "excess_parachute_payments", 15), # 1099-MISC Box 14
+            (("box 15",), "nonqualified_deferred_comp", 15), # 1099-MISC Box 15
+            
+            # PRIORITY 8: 1099-MISC field names
+            (("rents",), "rents", 10),
+            (("royalties",), "royalties", 10),
+            (("fishing", "boat"), "fishing_boat_proceeds", 10),
+            (("medical", "health"), "medical_payments", 10),
+            (("substitute", "payment"), "substitute_payments", 10),
+            (("crop", "insurance"), "crop_insurance_proceeds", 10),
+            (("attorney", "proceeds"), "gross_proceeds_attorney", 10),
+            (("parachute", "payment"), "excess_parachute_payments", 10),
+            (("deferred", "comp"), "nonqualified_deferred_comp", 10),
+            
+            # PRIORITY 7: 1099-INT field names
+            (("interest", "income"), "interest_income", 10),
+            (("savings", "bond"), "us_savings_bonds", 10),
+            (("interest", "subsidy"), "federal_interest_subsidy", 10),
+            
+            # PRIORITY 6: 1099-DIV field names
+            (("ordinary", "dividend"), "ordinary_dividends", 10),
+            (("qualified", "dividend"), "qualified_dividends", 10),
+            (("capital", "gain", "distribution"), "capital_gain_distributions", 10),
+            (("long", "term", "capital", "gain"), "long_term_capital_gains", 10),
+            (("section", "1250"), "unrecaptured_section_1250", 10),
+            (("section", "1202"), "section_1202_gains", 10),
+            (("collectible", "gain"), "collectibles_gains", 10),
+            (("nondividend"), "nondividend_distributions", 10),
+            (("investment", "expense"), "investment_expenses", 10),
+            
+            # PRIORITY 5: 1099-B field names (Brokerage)
+            (("proceeds",), "total_proceeds", 10),
+            (("cost", "basis"), "cost_basis", 10),
+            (("short", "term", "gain"), "short_term_gains", 10),
+            
+            # PRIORITY 4: 1099-K field names (Payment Card)
+            (("card", "transaction"), "card_not_present_transactions", 10),
+            (("merchant", "category"), "merchant_category_code", 10),
+            
+            # PRIORITY 3: 1099-OID field names (Original Issue Discount)
+            (("original", "issue", "discount"), "original_issue_discount", 10),
+            (("call", "redemption"), "oid_from_call_redemption", 10),
+            (("early", "redemption"), "early_redemption", 10),
             
             # PRIORITY 5: Generic terms (ONLY as fallback - lowest priority!)
             # NOTE: "gross pay" should NOT override official W-2 wages
@@ -1091,6 +1318,115 @@ class UniversalLLMTaxAgent:
                     normalized["capital_gains"] = value
                     print(f"[NORM] ⊙ '{raw_label}' → capital_gains (fuzzy) = {value}")
                     matched = True
+                # 1099-MISC field matching
+                elif "rent" in label_lower:
+                    normalized["rents"] = value
+                    print(f"[NORM] ⊙ '{raw_label}' → rents (fuzzy) = {value}")
+                    matched = True
+                elif "royalty" in label_lower:
+                    normalized["royalties"] = value
+                    print(f"[NORM] ⊙ '{raw_label}' → royalties (fuzzy) = {value}")
+                    matched = True
+                elif "fishing" in label_lower and "boat" in label_lower:
+                    normalized["fishing_boat_proceeds"] = value
+                    print(f"[NORM] ⊙ '{raw_label}' → fishing_boat_proceeds (fuzzy) = {value}")
+                    matched = True
+                elif "medical" in label_lower or "health" in label_lower:
+                    normalized["medical_payments"] = value
+                    print(f"[NORM] ⊙ '{raw_label}' → medical_payments (fuzzy) = {value}")
+                    matched = True
+                elif "substitute" in label_lower:
+                    normalized["substitute_payments"] = value
+                    print(f"[NORM] ⊙ '{raw_label}' → substitute_payments (fuzzy) = {value}")
+                    matched = True
+                elif "crop" in label_lower and "insurance" in label_lower:
+                    normalized["crop_insurance_proceeds"] = value
+                    print(f"[NORM] ⊙ '{raw_label}' → crop_insurance_proceeds (fuzzy) = {value}")
+                    matched = True
+                elif "attorney" in label_lower and "proceed" in label_lower:
+                    normalized["gross_proceeds_attorney"] = value
+                    print(f"[NORM] ⊙ '{raw_label}' → gross_proceeds_attorney (fuzzy) = {value}")
+                    matched = True
+                elif "parachute" in label_lower:
+                    normalized["excess_parachute_payments"] = value
+                    print(f"[NORM] ⊙ '{raw_label}' → excess_parachute_payments (fuzzy) = {value}")
+                    matched = True
+                elif "deferred" in label_lower and "comp" in label_lower:
+                    normalized["nonqualified_deferred_comp"] = value
+                    print(f"[NORM] ⊙ '{raw_label}' → nonqualified_deferred_comp (fuzzy) = {value}")
+                    matched = True
+                # 1099-INT field matching
+                elif "savings" in label_lower and "bond" in label_lower:
+                    normalized["us_savings_bonds"] = value
+                    print(f"[NORM] ⊙ '{raw_label}' → us_savings_bonds (fuzzy) = {value}")
+                    matched = True
+                elif "interest" in label_lower and "subsidy" in label_lower:
+                    normalized["federal_interest_subsidy"] = value
+                    print(f"[NORM] ⊙ '{raw_label}' → federal_interest_subsidy (fuzzy) = {value}")
+                    matched = True
+                # 1099-DIV field matching
+                elif "ordinary" in label_lower and "dividend" in label_lower:
+                    normalized["ordinary_dividends"] = value
+                    print(f"[NORM] ⊙ '{raw_label}' → ordinary_dividends (fuzzy) = {value}")
+                    matched = True
+                elif "qualified" in label_lower and "dividend" in label_lower:
+                    normalized["qualified_dividends"] = value
+                    print(f"[NORM] ⊙ '{raw_label}' → qualified_dividends (fuzzy) = {value}")
+                    matched = True
+                elif "capital" in label_lower and "gain" in label_lower and "distribution" in label_lower:
+                    normalized["capital_gain_distributions"] = value
+                    print(f"[NORM] ⊙ '{raw_label}' → capital_gain_distributions (fuzzy) = {value}")
+                    matched = True
+                elif "long" in label_lower and "term" in label_lower and "capital" in label_lower:
+                    normalized["long_term_capital_gains"] = value
+                    print(f"[NORM] ⊙ '{raw_label}' → long_term_capital_gains (fuzzy) = {value}")
+                    matched = True
+                elif "section" in label_lower and "1250" in label_lower:
+                    normalized["unrecaptured_section_1250"] = value
+                    print(f"[NORM] ⊙ '{raw_label}' → unrecaptured_section_1250 (fuzzy) = {value}")
+                    matched = True
+                elif "section" in label_lower and "1202" in label_lower:
+                    normalized["section_1202_gains"] = value
+                    print(f"[NORM] ⊙ '{raw_label}' → section_1202_gains (fuzzy) = {value}")
+                    matched = True
+                elif "collectible" in label_lower and "gain" in label_lower:
+                    normalized["collectibles_gains"] = value
+                    print(f"[NORM] ⊙ '{raw_label}' → collectibles_gains (fuzzy) = {value}")
+                    matched = True
+                elif "nondividend" in label_lower:
+                    normalized["nondividend_distributions"] = value
+                    print(f"[NORM] ⊙ '{raw_label}' → nondividend_distributions (fuzzy) = {value}")
+                    matched = True
+                elif "investment" in label_lower and "expense" in label_lower:
+                    normalized["investment_expenses"] = value
+                    print(f"[NORM] ⊙ '{raw_label}' → investment_expenses (fuzzy) = {value}")
+                    matched = True
+                elif "foreign" in label_lower and "tax" in label_lower:
+                    normalized["foreign_tax_paid"] = value
+                    print(f"[NORM] ⊙ '{raw_label}' → foreign_tax_paid (fuzzy) = {value}")
+                    matched = True
+                # 1099-B field matching
+                elif "short" in label_lower and "term" in label_lower and "gain" in label_lower:
+                    normalized["short_term_gains"] = value
+                    print(f"[NORM] ⊙ '{raw_label}' → short_term_gains (fuzzy) = {value}")
+                    matched = True
+                # 1099-K field matching
+                elif "merchant" in label_lower and "category" in label_lower:
+                    # Don't set as numeric value since it's a code
+                    matched = True
+                # 1099-OID field matching
+                elif "original" in label_lower and "issue" in label_lower and "discount" in label_lower:
+                    normalized["original_issue_discount"] = value
+                    print(f"[NORM] ⊙ '{raw_label}' → original_issue_discount (fuzzy) = {value}")
+                    matched = True
+                elif "call" in label_lower and "redemption" in label_lower:
+                    normalized["oid_from_call_redemption"] = value
+                    print(f"[NORM] ⊙ '{raw_label}' → oid_from_call_redemption (fuzzy) = {value}")
+                    matched = True
+                elif "early" in label_lower and "redemption" in label_lower:
+                    normalized["early_redemption"] = value
+                    print(f"[NORM] ⊙ '{raw_label}' → early_redemption (fuzzy) = {value}")
+                    matched = True
                 
                 if not matched:
                     print(f"[NORM] ✗ '{raw_label}' (no mapping found)")
@@ -1147,8 +1483,12 @@ EXTRACTED VALUES
 """
         
         for key, value in normalized.items():
-            if value > 0:
-                summary += f"{key:40s}: ${value:12,.2f}\n"
+            try:
+                val_num = float(value) if isinstance(value, str) else value
+                if isinstance(val_num, (int, float)) and val_num > 0:
+                    summary += f"{key:40s}: ${val_num:12,.2f}\n"
+            except (ValueError, TypeError):
+                pass
         
         # Show missing values
         missing_values = [k for k, v in normalized.items() if v == 0]

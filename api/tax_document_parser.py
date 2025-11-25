@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 
 class DocumentType(Enum):
     W2 = "W-2"
+    FORM_1099_MISC = "1099-MISC"
     FORM_1099_NEC = "1099-NEC"
     FORM_1099_INT = "1099-INT"
     UNKNOWN = "UNKNOWN"
@@ -42,6 +43,7 @@ class TaxDocumentParser:
     
     def __init__(self):
         self.doc_type_patterns = {
+            DocumentType.FORM_1099_MISC: [r"1099[\s-]?misc", r"miscellaneous\s+income", r"form\s+1099[\s-]?misc", r"royalties", r"nonemployee compensation.*box 7"],
             DocumentType.W2: [r"w[\s-]?2", r"form\s+w[\s-]?2", r"wage\s+and\s+tax", r"box\s+1[\s]*wages"],
             DocumentType.FORM_1099_NEC: [r"1099[\s-]?nec", r"nonemployee\s+compensation", r"form\s+1099[\s-]?nec"],
             DocumentType.FORM_1099_INT: [r"1099[\s-]?int", r"interest\s+income", r"form\s+1099[\s-]?int"],
@@ -72,6 +74,16 @@ class TaxDocumentParser:
             "employer_ein": r"EIN.*?(\d{2}-\d{7})",
             "employer_name": r"employer.*?:\s*([^\n]+)",
             "employee_ssn": r"SSN.*?(\d{3}-\d{2}-\d{4})",
+        }
+        
+        self.form_1099_misc_fields = {
+            "nonemployee_compensation": r"(?:Box\s*7|7\s+Nonemployee)[\s\$]*([0-9,]+(?:\.\d{2})?)",
+            "federal_income_tax_withheld": r"(?:Box\s*4|4\s+Federal)[\s\$]*([0-9,]+(?:\.\d{2})?)",
+            "rents": r"(?:Box\s*1|1\s+Rents)[\s\$]*([0-9,]+(?:\.\d{2})?)",
+            "royalties": r"(?:Box\s*2|2\s+Royalties)[\s\$]*([0-9,]+(?:\.\d{2})?)",
+            "payer_name": r"payer.*?:\s*([^\n]+)",
+            "payer_ein": r"payer\s+(?:federal\s+)?identification\s+number.*?(\d{2}-\d{7})",
+            "recipient_tin": r"recipient.*?identification\s+number.*?(\d{3}-\d{2}-\d{4})",
         }
         
         self.form_1099_nec_fields = {
@@ -365,6 +377,8 @@ class TaxDocumentParser:
         
         if doc_type == DocumentType.W2:
             field_patterns = self.w2_fields
+        elif doc_type == DocumentType.FORM_1099_MISC:
+            field_patterns = self.form_1099_misc_fields
         elif doc_type == DocumentType.FORM_1099_NEC:
             field_patterns = self.form_1099_nec_fields
         elif doc_type == DocumentType.FORM_1099_INT:
@@ -402,6 +416,7 @@ class TaxDocumentParser:
         
         Uses LandingAI field names:
         - W-2: wages, federal_income_tax_withheld, employee_ssn
+        - 1099-MISC: nonemployee_compensation (Box 7), federal_income_tax_withheld, recipient_tin
         - 1099-NEC: nonemployee_compensation, federal_income_tax_withheld, recipient_tin
         - 1099-INT: interest_income, federal_income_tax_withheld, recipient_tin
         """
@@ -413,6 +428,12 @@ class TaxDocumentParser:
                 issues.append("W-2: wages (wage and tax statement box 1) not found or is $0")
             if not data.get("employee_ssn"):
                 issues.append("W-2: employee_ssn not found")
+        
+        elif doc_type == DocumentType.FORM_1099_MISC:
+            if not data.get("nonemployee_compensation") or data.get("nonemployee_compensation") == 0.0:
+                issues.append("1099-MISC: nonemployee_compensation (box 7) not found or is $0")
+            if not data.get("recipient_tin"):
+                issues.append("1099-MISC: recipient_tin not found")
         
         elif doc_type == DocumentType.FORM_1099_NEC:
             if not data.get("nonemployee_compensation") or data.get("nonemployee_compensation") == 0.0:

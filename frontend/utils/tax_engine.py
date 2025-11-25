@@ -129,10 +129,57 @@ def aggregate_documents(docs: List[Dict[str, float]]) -> Dict[str, float]:
         "social_security_tax_withheld": 0.0,
         "medicare_tax_withheld": 0.0,
         
-        # 1099 specific fields (self-employment, interest, dividends)
+        # 1099-NEC (Self-employment income)
         "nonemployee_compensation": 0.0,
+        
+        # 1099-MISC (Miscellaneous income from various sources)
+        "rents": 0.0,                           # Box 1
+        "royalties": 0.0,                       # Box 2
+        "other_income": 0.0,                    # Box 3
+        "fishing_boat_proceeds": 0.0,           # Box 5
+        "medical_payments": 0.0,                # Box 6 (NOT taxable to recipient)
+        "substitute_payments": 0.0,             # Box 8 (Substitute for dividends/interest)
+        "crop_insurance_proceeds": 0.0,         # Box 9
+        "gross_proceeds_attorney": 0.0,         # Box 10
+        "excess_parachute_payments": 0.0,       # Box 14
+        "nonqualified_deferred_comp": 0.0,      # Box 15
+        
+        # 1099-INT (Interest income)
         "interest_income": 0.0,
-        "dividend_income": 0.0,
+        "us_savings_bonds": 0.0,
+        "federal_interest_subsidy": 0.0,
+        
+        # 1099-DIV (Dividend income)
+        "qualified_dividends": 0.0,
+        "ordinary_dividends": 0.0,
+        "capital_gain_distributions": 0.0,
+        "long_term_capital_gains": 0.0,
+        "unrecaptured_section_1250": 0.0,
+        "section_1202_gains": 0.0,
+        "collectibles_gains": 0.0,
+        "nondividend_distributions": 0.0,
+        "investment_expenses": 0.0,
+        "foreign_tax_paid": 0.0,
+        
+        # 1099-B (Brokerage proceeds)
+        "total_proceeds": 0.0,
+        "cost_basis": 0.0,
+        "short_term_gains": 0.0,
+        "long_term_gains": 0.0,
+        "adjustment_code": "",
+        "gain_or_loss": 0.0,
+        
+        # 1099-K (Payment card transactions)
+        "card_not_present_transactions": 0.0,
+        "merchant_category_code": "",
+        
+        # 1099-OID (Original Issue Discount)
+        "original_issue_discount": 0.0,
+        "oid_from_call_redemption": 0.0,
+        "early_redemption": 0.0,
+        "oid_accrued_this_year": 0.0,
+        
+        # Capital gains
         "capital_gains": 0.0,
     }
 
@@ -150,15 +197,144 @@ def aggregate_documents(docs: List[Dict[str, float]]) -> Dict[str, float]:
             totals["nonemployee_compensation"] += doc["nonemployee_compensation"]
             print(f"[DEBUG]   1099-NEC Income: ${doc['nonemployee_compensation']:,.2f} [ISOLATED - SELF-EMPLOYMENT ONLY]")
         
+        # 1099-MISC income sources
+        if "rents" in doc and doc["rents"] > 0:
+            totals["rents"] += doc["rents"]
+            print(f"[DEBUG]   1099-MISC Rents: ${doc['rents']:,.2f} [ISOLATED - 1099-MISC BOX 1]")
+        
+        if "royalties" in doc and doc["royalties"] > 0:
+            totals["royalties"] += doc["royalties"]
+            print(f"[DEBUG]   1099-MISC Royalties: ${doc['royalties']:,.2f} [ISOLATED - 1099-MISC BOX 2]")
+        
+        if "other_income" in doc and doc["other_income"] > 0:
+            totals["other_income"] += doc["other_income"]
+            print(f"[DEBUG]   1099-MISC Other Income: ${doc['other_income']:,.2f} [ISOLATED - 1099-MISC BOX 3]")
+        
+        if "fishing_boat_proceeds" in doc and doc["fishing_boat_proceeds"] > 0:
+            totals["fishing_boat_proceeds"] += doc["fishing_boat_proceeds"]
+            print(f"[DEBUG]   1099-MISC Fishing Proceeds: ${doc['fishing_boat_proceeds']:,.2f} [ISOLATED - 1099-MISC BOX 5]")
+        
+        if "medical_payments" in doc and doc["medical_payments"] > 0:
+            totals["medical_payments"] += doc["medical_payments"]
+            print(f"[DEBUG]   1099-MISC Medical Payments: ${doc['medical_payments']:,.2f} [ISOLATED - 1099-MISC BOX 6 - NOT TAXABLE]")
+        
+        # Box 8: Substitute payments for dividends or interest
+        if "substitute_payments" in doc and doc["substitute_payments"] > 0:
+            totals["substitute_payments"] += doc["substitute_payments"]
+            print(f"[DEBUG]   1099-MISC Substitute Payments: ${doc['substitute_payments']:,.2f} [ISOLATED - 1099-MISC BOX 8]")
+        
+        # Box 9: Crop insurance proceeds
+        if "crop_insurance_proceeds" in doc and doc["crop_insurance_proceeds"] > 0:
+            totals["crop_insurance_proceeds"] += doc["crop_insurance_proceeds"]
+            print(f"[DEBUG]   1099-MISC Crop Insurance: ${doc['crop_insurance_proceeds']:,.2f} [ISOLATED - 1099-MISC BOX 9]")
+        
+        # Box 10: Gross proceeds paid to attorney
+        if "gross_proceeds_attorney" in doc and doc["gross_proceeds_attorney"] > 0:
+            totals["gross_proceeds_attorney"] += doc["gross_proceeds_attorney"]
+            print(f"[DEBUG]   1099-MISC Attorney Proceeds: ${doc['gross_proceeds_attorney']:,.2f} [ISOLATED - 1099-MISC BOX 10]")
+        
+        # Box 14: Excess golden parachute payments
+        if "excess_parachute_payments" in doc and doc["excess_parachute_payments"] > 0:
+            totals["excess_parachute_payments"] += doc["excess_parachute_payments"]
+            print(f"[DEBUG]   1099-MISC Parachute Payments: ${doc['excess_parachute_payments']:,.2f} [ISOLATED - 1099-MISC BOX 14]")
+        
+        # Box 15: Nonqualified deferred compensation
+        if "nonqualified_deferred_comp" in doc and doc["nonqualified_deferred_comp"] > 0:
+            totals["nonqualified_deferred_comp"] += doc["nonqualified_deferred_comp"]
+            print(f"[DEBUG]   1099-MISC Deferred Comp: ${doc['nonqualified_deferred_comp']:,.2f} [ISOLATED - 1099-MISC BOX 15]")
+        
         # 1099-INT interest - SEPARATE from wages
         if "interest_income" in doc and doc["interest_income"] > 0:
             totals["interest_income"] += doc["interest_income"]
             print(f"[DEBUG]   1099-INT Interest: ${doc['interest_income']:,.2f} [ISOLATED - INTEREST ONLY]")
         
+        if "us_savings_bonds" in doc and doc["us_savings_bonds"] > 0:
+            totals["us_savings_bonds"] += doc["us_savings_bonds"]
+            print(f"[DEBUG]   1099-INT Savings Bonds: ${doc['us_savings_bonds']:,.2f} [ISOLATED - 1099-INT BOX 3]")
+        
+        if "federal_interest_subsidy" in doc and doc["federal_interest_subsidy"] > 0:
+            totals["federal_interest_subsidy"] += doc["federal_interest_subsidy"]
+            print(f"[DEBUG]   1099-INT Interest Subsidy: ${doc['federal_interest_subsidy']:,.2f} [ISOLATED - 1099-INT BOX 4]")
+        
         # 1099-DIV dividends - SEPARATE from wages
-        if "dividend_income" in doc and doc["dividend_income"] > 0:
-            totals["dividend_income"] += doc["dividend_income"]
-            print(f"[DEBUG]   1099-DIV Dividends: ${doc['dividend_income']:,.2f} [ISOLATED - DIVIDENDS ONLY]")
+        if "qualified_dividends" in doc and doc["qualified_dividends"] > 0:
+            totals["qualified_dividends"] += doc["qualified_dividends"]
+            print(f"[DEBUG]   1099-DIV Qualified Dividends: ${doc['qualified_dividends']:,.2f} [ISOLATED - DIVIDENDS ONLY]")
+        
+        if "ordinary_dividends" in doc and doc["ordinary_dividends"] > 0:
+            totals["ordinary_dividends"] += doc["ordinary_dividends"]
+            print(f"[DEBUG]   1099-DIV Ordinary Dividends: ${doc['ordinary_dividends']:,.2f} [ISOLATED - DIVIDENDS ONLY]")
+        
+        if "capital_gain_distributions" in doc and doc["capital_gain_distributions"] > 0:
+            totals["capital_gain_distributions"] += doc["capital_gain_distributions"]
+            print(f"[DEBUG]   1099-DIV Capital Gain Distributions: ${doc['capital_gain_distributions']:,.2f} [ISOLATED - 1099-DIV BOX 2a]")
+        
+        if "long_term_capital_gains" in doc and doc["long_term_capital_gains"] > 0:
+            totals["long_term_capital_gains"] += doc["long_term_capital_gains"]
+            print(f"[DEBUG]   1099-DIV Long-Term Capital Gains: ${doc['long_term_capital_gains']:,.2f} [ISOLATED - 1099-DIV BOX 2b]")
+        
+        if "unrecaptured_section_1250" in doc and doc["unrecaptured_section_1250"] > 0:
+            totals["unrecaptured_section_1250"] += doc["unrecaptured_section_1250"]
+            print(f"[DEBUG]   1099-DIV Section 1250: ${doc['unrecaptured_section_1250']:,.2f} [ISOLATED - 1099-DIV BOX 2d]")
+        
+        if "section_1202_gains" in doc and doc["section_1202_gains"] > 0:
+            totals["section_1202_gains"] += doc["section_1202_gains"]
+            print(f"[DEBUG]   1099-DIV Section 1202 Gains: ${doc['section_1202_gains']:,.2f} [ISOLATED - 1099-DIV BOX 2e]")
+        
+        if "collectibles_gains" in doc and doc["collectibles_gains"] > 0:
+            totals["collectibles_gains"] += doc["collectibles_gains"]
+            print(f"[DEBUG]   1099-DIV Collectibles Gains: ${doc['collectibles_gains']:,.2f} [ISOLATED - 1099-DIV BOX 2f]")
+        
+        if "nondividend_distributions" in doc and doc["nondividend_distributions"] > 0:
+            totals["nondividend_distributions"] += doc["nondividend_distributions"]
+            print(f"[DEBUG]   1099-DIV Nondividend Distributions: ${doc['nondividend_distributions']:,.2f} [ISOLATED - 1099-DIV BOX 3]")
+        
+        if "investment_expenses" in doc and doc["investment_expenses"] > 0:
+            totals["investment_expenses"] += doc["investment_expenses"]
+            print(f"[DEBUG]   1099-DIV Investment Expenses: ${doc['investment_expenses']:,.2f} [ISOLATED - 1099-DIV BOX 5]")
+        
+        if "foreign_tax_paid" in doc and doc["foreign_tax_paid"] > 0:
+            totals["foreign_tax_paid"] += doc["foreign_tax_paid"]
+            print(f"[DEBUG]   1099-DIV Foreign Tax Paid: ${doc['foreign_tax_paid']:,.2f} [ISOLATED - 1099-DIV BOX 7]")
+        
+        # 1099-B brokerage proceeds
+        if "total_proceeds" in doc and doc["total_proceeds"] > 0:
+            totals["total_proceeds"] += doc["total_proceeds"]
+            print(f"[DEBUG]   1099-B Total Proceeds: ${doc['total_proceeds']:,.2f} [ISOLATED - BROKERAGE ONLY]")
+        
+        if "cost_basis" in doc and doc["cost_basis"] > 0:
+            totals["cost_basis"] += doc["cost_basis"]
+            print(f"[DEBUG]   1099-B Cost Basis: ${doc['cost_basis']:,.2f} [ISOLATED - BROKERAGE ONLY]")
+        
+        if "short_term_gains" in doc and doc["short_term_gains"] > 0:
+            totals["short_term_gains"] += doc["short_term_gains"]
+            print(f"[DEBUG]   1099-B Short-Term Gains: ${doc['short_term_gains']:,.2f} [ISOLATED - BROKERAGE SHORT-TERM]")
+        
+        if "long_term_gains" in doc and doc["long_term_gains"] > 0:
+            totals["long_term_gains"] += doc["long_term_gains"]
+            print(f"[DEBUG]   1099-B Long-Term Gains: ${doc['long_term_gains']:,.2f} [ISOLATED - BROKERAGE LONG-TERM]")
+        
+        # 1099-K payment card transactions
+        if "card_not_present_transactions" in doc and doc["card_not_present_transactions"] > 0:
+            totals["card_not_present_transactions"] += doc["card_not_present_transactions"]
+            print(f"[DEBUG]   1099-K Card Transactions: ${doc['card_not_present_transactions']:,.2f} [ISOLATED - PAYMENT CARD ONLY]")
+        
+        # 1099-OID original issue discount
+        if "original_issue_discount" in doc and doc["original_issue_discount"] > 0:
+            totals["original_issue_discount"] += doc["original_issue_discount"]
+            print(f"[DEBUG]   1099-OID Original Issue Discount: ${doc['original_issue_discount']:,.2f} [ISOLATED - OID ORIGINAL]")
+        
+        if "oid_from_call_redemption" in doc and doc["oid_from_call_redemption"] > 0:
+            totals["oid_from_call_redemption"] += doc["oid_from_call_redemption"]
+            print(f"[DEBUG]   1099-OID Call/Redemption: ${doc['oid_from_call_redemption']:,.2f} [ISOLATED - OID CALL/REDEMPTION]")
+        
+        if "early_redemption" in doc and doc["early_redemption"] > 0:
+            totals["early_redemption"] += doc["early_redemption"]
+            print(f"[DEBUG]   1099-OID Early Redemption: ${doc['early_redemption']:,.2f} [ISOLATED - OID EARLY REDEMPTION]")
+        
+        if "oid_accrued_this_year" in doc and doc["oid_accrued_this_year"] > 0:
+            totals["oid_accrued_this_year"] += doc["oid_accrued_this_year"]
+            print(f"[DEBUG]   1099-OID Accrued This Year: ${doc['oid_accrued_this_year']:,.2f} [ISOLATED - OID ACCRUED]")
         
         # Capital gains - SEPARATE category
         if "capital_gains" in doc and doc["capital_gains"] > 0:
@@ -182,16 +358,109 @@ def aggregate_documents(docs: List[Dict[str, float]]) -> Dict[str, float]:
     print(f"\n[DEBUG] INCOME AGGREGATION (Strict Separation):")
     print(f"[DEBUG]   W-2 WAGES: ${totals['wages']:,.2f}")
     print(f"[DEBUG]   1099-NEC (Self-Employment): ${totals['nonemployee_compensation']:,.2f}")
-    print(f"[DEBUG]   1099-INT (Interest): ${totals['interest_income']:,.2f}")
-    print(f"[DEBUG]   1099-DIV (Dividends): ${totals['dividend_income']:,.2f}")
-    print(f"[DEBUG]   Capital Gains: ${totals['capital_gains']:,.2f}")
     
+    # 1099-MISC Box 5 (Fishing Boat Proceeds) is SELF-EMPLOYMENT INCOME
+    # Must be separated from other 1099-MISC boxes
+    fishing_se_income = totals['fishing_boat_proceeds']
+    
+    # 1099-MISC includes ORDINARY INCOME boxes (excludes Box 5 fishing, Box 6 medical, Box 7 direct sales)
+    misc_total = (totals['rents'] + totals['royalties'] + totals['other_income'] + 
+                  totals['substitute_payments'] + 
+                  totals['crop_insurance_proceeds'] + totals['gross_proceeds_attorney'] + 
+                  totals['excess_parachute_payments'] + totals['nonqualified_deferred_comp'])
+    print(f"[DEBUG]   1099-MISC (8 ordinary income boxes): ${misc_total:,.2f}")
+    print(f"[DEBUG]   1099-MISC Box 5 (Fishing - SE income): ${fishing_se_income:,.2f}")
+    
+    # 1099-INT includes all interest variations
+    int_total = (totals['interest_income'] + totals['us_savings_bonds'] + totals['federal_interest_subsidy'])
+    print(f"[DEBUG]   1099-INT (Interest + Bonds + Subsidy): ${int_total:,.2f}")
+    
+    # 1099-DIV includes all dividend types and capital gains
+    div_total = (totals['ordinary_dividends'] + totals['qualified_dividends'] + 
+                 totals['capital_gain_distributions'] + totals['long_term_capital_gains'] +
+                 totals['unrecaptured_section_1250'] + totals['section_1202_gains'] + 
+                 totals['collectibles_gains'] + totals['nondividend_distributions'] -
+                 totals['investment_expenses'] + totals['foreign_tax_paid'])
+    print(f"[DEBUG]   1099-DIV (Dividends + Capital Gains + Distributions): ${div_total:,.2f}")
+    
+    # 1099-B includes brokerage proceeds and gains
+    b_total = (totals['total_proceeds'] - totals['cost_basis'] + 
+               totals['short_term_gains'] + totals['long_term_gains'])
+    print(f"[DEBUG]   1099-B (Brokerage Proceeds - Basis + Gains): ${b_total:,.2f}")
+    
+    # 1099-K payment card income
+    k_total = totals['card_not_present_transactions']
+    print(f"[DEBUG]   1099-K (Payment Card Transactions): ${k_total:,.2f}")
+    
+    # 1099-OID original issue discount income
+    oid_total = (totals['original_issue_discount'] + totals['oid_from_call_redemption'] + 
+                 totals['early_redemption'] + totals['oid_accrued_this_year'])
+    print(f"[DEBUG]   1099-OID (Original + Call + Early + Accrued): ${oid_total:,.2f}")
+    
+    # Other capital gains (separate from 1099-B/DIV)
+    print(f"[DEBUG]   Capital Gains (Other): ${totals['capital_gains']:,.2f}")
+    
+    # Aggregate all 1099-MISC items (IRS standard treatment - includes taxable boxes EXCEPT Box 5)
+    # Box 5 (Fishing Boat Proceeds) is SELF-EMPLOYMENT INCOME, not ordinary income
+    # EXCLUDES Box 5 (fishing_boat_proceeds) - SELF-EMPLOYMENT INCOME
+    # EXCLUDES Box 6 (medical_payments) - NOT taxable to recipient
+    # EXCLUDES Box 7 (direct_sales) - informational only
+    # EXCLUDES Box 11 (fish purchased for resale) - reimbursement, not income
+    misc_income = (totals["rents"] +                    # Box 1
+                   totals["royalties"] +                # Box 2
+                   totals["other_income"] +             # Box 3
+                   totals["substitute_payments"] +      # Box 8
+                   totals["crop_insurance_proceeds"] +  # Box 9
+                   totals["gross_proceeds_attorney"] +  # Box 10
+                   totals["excess_parachute_payments"] +# Box 14
+                   totals["nonqualified_deferred_comp"]) # Box 15
+    
+    # Self-employment income includes:
+    # - 1099-NEC nonemployee compensation
+    # - 1099-MISC Box 5 (Fishing Boat Proceeds)
+    se_income_total = totals["nonemployee_compensation"] + fishing_se_income
+    
+    # Aggregate 1099-INT interest income (all interest variations)
+    interest_income = (totals["interest_income"] + 
+                       totals["us_savings_bonds"] + 
+                       totals["federal_interest_subsidy"])
+    
+    # Aggregate 1099-DIV dividend income (all dividend types and capital gains)
+    dividend_income = (totals["ordinary_dividends"] + 
+                       totals["qualified_dividends"] + 
+                       totals["capital_gain_distributions"] + 
+                       totals["long_term_capital_gains"] +
+                       totals["unrecaptured_section_1250"] + 
+                       totals["section_1202_gains"] + 
+                       totals["collectibles_gains"] + 
+                       totals["nondividend_distributions"] -
+                       totals["investment_expenses"] + 
+                       totals["foreign_tax_paid"])
+    totals["dividend_income"] = dividend_income
+    
+    # Aggregate 1099-B brokerage income (proceeds - cost basis + gains)
+    brokerage_income = (totals["total_proceeds"] - 
+                        totals["cost_basis"] + 
+                        totals["short_term_gains"] + 
+                        totals["long_term_gains"])
+    
+    # Aggregate 1099-OID original issue discount income
+    oid_income = (totals["original_issue_discount"] + 
+                  totals["oid_from_call_redemption"] + 
+                  totals["early_redemption"] + 
+                  totals["oid_accrued_this_year"])
+    
+    # Calculate total income from all sources
     totals["total_income"] = (
-        totals["wages"]
-        + totals["nonemployee_compensation"]
-        + totals["interest_income"]
-        + totals["dividend_income"]
-        + totals["capital_gains"]
+        totals["wages"] +                              # W-2
+        se_income_total +                             # 1099-NEC + 1099-MISC Box 5 (SE income)
+        misc_income +                                  # 1099-MISC (8 ordinary boxes, NOT Box 5)
+        interest_income +                              # 1099-INT (all variations)
+        dividend_income +                              # 1099-DIV (all types)
+        brokerage_income +                             # 1099-B (proceeds - basis + gains)
+        totals["card_not_present_transactions"] +     # 1099-K
+        oid_income +                                   # 1099-OID (all types)
+        totals["capital_gains"]                        # Other capital gains
     )
     print(f"[DEBUG]   TOTAL INCOME (sum of above): ${totals['total_income']:,.2f}")
 
@@ -317,30 +586,34 @@ def compute_federal_tax_2024(taxable_income: float, filing_status: str = "single
     return federal_tax
 
 
-def compute_self_employment_tax(nec_income: float) -> float:
+def compute_self_employment_tax(se_income: float) -> float:
     """
-    Compute self-employment tax on 1099-NEC income ONLY.
-    SE tax = 92.35% of NEC income × 15.3% (Social Security 12.4% + Medicare 2.9%)
+    Compute self-employment tax on combined self-employment income.
+    SE tax = 92.35% of SE income × 15.3% (Social Security 12.4% + Medicare 2.9%)
+    
+    SE Income includes:
+    - 1099-NEC income (nonemployee compensation)
+    - 1099-MISC Box 5 (fishing boat proceeds - treated as SE income per IRS)
     
     STRICT ISOLATION:
-    - This ONLY applies to 1099-NEC income (nonemployee compensation)
+    - This ONLY applies to self-employment income (NEC + fishing)
     - NEVER applies to W-2 wages
     - NEVER mixes with federal income tax calculation
     - Separate calculation path from W-2 taxes
     """
-    if nec_income <= 0:
+    if se_income <= 0:
         return 0.0
 
     # 92.35% is the portion subject to SE tax (after deduction)
-    se_tax_base = nec_income * 0.9235
+    se_tax_base = se_income * 0.9235
     se_tax = se_tax_base * 0.153
 
     se_tax = round(se_tax, 2)
-    print(f"\n[DEBUG] SELF-EMPLOYMENT TAX Calculation (1099-NEC ONLY):")
-    print(f"[DEBUG]   1099-NEC Income: ${nec_income:,.2f} [SOURCE: 1099-NEC - ISOLATED]")
+    print(f"\n[DEBUG] SELF-EMPLOYMENT TAX Calculation (Combined SE Income):")
+    print(f"[DEBUG]   SE Income (NEC + Fishing): ${se_income:,.2f} [SOURCE: 1099-NEC + 1099-MISC Box 5]")
     print(f"[DEBUG]   SE Tax Base (92.35%): ${se_tax_base:,.2f}")
     print(f"[DEBUG]   SE Tax (15.3%): ${se_tax:,.2f}")
-    print(f"[DEBUG]   NOTE: Applied ONLY to 1099-NEC, NOT to W-2 wages\n")
+    print(f"[DEBUG]   NOTE: Applied to 1099-NEC and 1099-MISC Box 5, NOT to W-2 wages\n")
 
     return se_tax
 
@@ -431,6 +704,8 @@ def calculate_tax(
     # Extract each field type - KEEP SEPARATE, DON'T MIX
     wages = totals["wages"]  # From W-2, Box 1 ONLY
     nec_income = totals["nonemployee_compensation"]  # From 1099-NEC ONLY
+    fishing_se_income = totals.get("fishing_boat_proceeds", 0.0)  # From 1099-MISC Box 5 - SE income
+    se_income = nec_income + fishing_se_income  # Total self-employment income
     interest = totals["interest_income"]  # From 1099-INT ONLY
     dividends = totals["dividend_income"]  # From 1099-DIV ONLY
     capital_gains = totals.get("capital_gains", 0.0)  # From 1099-B ONLY
@@ -446,6 +721,8 @@ def calculate_tax(
     print(f"\n[STEP 1] Field Isolation Verification:")
     print(f"[ISOLATION] W-2 Wages (Box 1): ${wages:,.2f} ← W-2 ONLY")
     print(f"[ISOLATION] 1099-NEC Income: ${nec_income:,.2f} ← NEC ONLY")
+    print(f"[ISOLATION] 1099-MISC Box 5 (Fishing SE): ${fishing_se_income:,.2f} ← MISC BOX 5 (SE)")
+    print(f"[ISOLATION] Total SE Income: ${se_income:,.2f} ← NEC + MISC Box 5")
     print(f"[ISOLATION] 1099-INT Interest: ${interest:,.2f} ← INTEREST ONLY")
     print(f"[ISOLATION] 1099-DIV Dividends: ${dividends:,.2f} ← DIVIDENDS ONLY")
     print(f"[ISOLATION] Fed Withheld: ${fed_withheld:,.2f} ← FEDERAL ONLY")
@@ -469,8 +746,8 @@ def calculate_tax(
     print("[STEP 3A] Federal Income Tax (from aggregate income)")
     federal_tax = compute_federal_tax_2024(taxable_income, filing_status, income_source="W-2 + 1099 Income")
     
-    print("[STEP 3B] Self-Employment Tax (from 1099-NEC ONLY)")
-    se_tax = compute_self_employment_tax(nec_income)
+    print("[STEP 3B] Self-Employment Tax (from 1099-NEC + 1099-MISC Box 5 Fishing)")
+    se_tax = compute_self_employment_tax(se_income)
     
     total_tax_before_credits = federal_tax + se_tax
     print(f"\n[DEBUG] TOTAL TAX (Federal + SE): ${total_tax_before_credits:,.2f}")

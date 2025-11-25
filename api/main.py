@@ -1256,3 +1256,14 @@ async def get_tax_summary():
     except Exception as e:
         api_logger.error(f"Failed to get tax summary: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+# ============================================================================
+# LLM TAX AGENT ROUTES
+# ============================================================================
+
+try:
+    from routes.tax_agent_routes import router as tax_agent_router
+    app.include_router(tax_agent_router)
+    api_logger.info("✅ LLM Tax Agent routes included")
+except Exception as e:
+    api_logger.warning(f"⚠️  LLM Tax Agent routes not available: {str(e)}")

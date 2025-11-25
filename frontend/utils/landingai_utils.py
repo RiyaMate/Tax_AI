@@ -68,6 +68,13 @@ class DocumentType(str, Enum):
     W2 = "W-2"
     FORM_1099_NEC = "1099-NEC"
     FORM_1099_INT = "1099-INT"
+    FORM_1099_DIV = "1099-DIV"
+    FORM_1099_B = "1099-B"
+    FORM_1099_MISC = "1099-MISC"
+    FORM_1099_K = "1099-K"
+    FORM_1099_OID = "1099-OID"
+    FORM_1098 = "1098"
+    FORM_1098_T = "1098-T"
     UNKNOWN = "UNKNOWN"
 # -----------------------
 # TAX-SPECIFIC VALIDATION SCHEMAS
@@ -170,6 +177,154 @@ VALIDATION_SCHEMAS = {
             "recipient_tin": {
                 "type": "ssn",
                 "regex": r'^\d{3}-\d{2}-\d{4}$'
+            }
+        }
+    },
+    "1099-DIV": {
+        "required_fields": ["qualified_dividends", "federal_income_tax_withheld"],
+        "optional_fields": ["ordinary_dividends", "payer_tin", "recipient_tin"],
+        "field_rules": {
+            "qualified_dividends": {
+                "type": "currency",
+                "min": 0,
+                "max": 10000000,
+                "precision": 2,
+                "regex": r'^\d+\.?\d{0,2}$'
+            },
+            "ordinary_dividends": {
+                "type": "currency",
+                "min": 0,
+                "max": 10000000,
+                "precision": 2,
+                "regex": r'^\d+\.?\d{0,2}$'
+            },
+            "federal_income_tax_withheld": {
+                "type": "currency",
+                "min": 0,
+                "max": 10000000,
+                "precision": 2,
+                "regex": r'^\d+\.?\d{0,2}$'
+            }
+        }
+    },
+    "1099-B": {
+        "required_fields": ["total_proceeds"],
+        "optional_fields": ["cost_basis", "federal_income_tax_withheld", "payer_tin", "recipient_tin"],
+        "field_rules": {
+            "total_proceeds": {
+                "type": "currency",
+                "min": 0,
+                "max": 999999999,
+                "precision": 2,
+                "regex": r'^\d+\.?\d{0,2}$'
+            },
+            "cost_basis": {
+                "type": "currency",
+                "min": 0,
+                "max": 999999999,
+                "precision": 2,
+                "regex": r'^\d+\.?\d{0,2}$'
+            }
+        }
+    },
+    "1099-MISC": {
+        "required_fields": [],
+        "optional_fields": ["rents", "royalties", "other_income", "nonemployee_compensation", 
+                          "federal_income_tax_withheld", "payer_ein", "recipient_tin"],
+        "field_rules": {
+            "rents": {
+                "type": "currency",
+                "min": 0,
+                "max": 10000000,
+                "precision": 2,
+                "regex": r'^\d+\.?\d{0,2}$'
+            },
+            "royalties": {
+                "type": "currency",
+                "min": 0,
+                "max": 10000000,
+                "precision": 2,
+                "regex": r'^\d+\.?\d{0,2}$'
+            },
+            "other_income": {
+                "type": "currency",
+                "min": 0,
+                "max": 10000000,
+                "precision": 2,
+                "regex": r'^\d+\.?\d{0,2}$'
+            },
+            "nonemployee_compensation": {
+                "type": "currency",
+                "min": 0,
+                "max": 10000000,
+                "precision": 2,
+                "regex": r'^\d+\.?\d{0,2}$'
+            },
+            "federal_income_tax_withheld": {
+                "type": "currency",
+                "min": 0,
+                "max": 10000000,
+                "precision": 2,
+                "regex": r'^\d+\.?\d{0,2}$'
+            }
+        }
+    },
+    "1099-K": {
+        "required_fields": ["card_not_present_transactions"],
+        "optional_fields": ["merchant_category_code", "federal_income_tax_withheld", "payer_tin", "recipient_tin"],
+        "field_rules": {
+            "card_not_present_transactions": {
+                "type": "currency",
+                "min": 0,
+                "max": 999999999,
+                "precision": 2,
+                "regex": r'^\d+\.?\d{0,2}$'
+            }
+        }
+    },
+    "1099-OID": {
+        "required_fields": ["original_issue_discount"],
+        "optional_fields": ["federal_income_tax_withheld", "payer_tin", "recipient_tin"],
+        "field_rules": {
+            "original_issue_discount": {
+                "type": "currency",
+                "min": 0,
+                "max": 10000000,
+                "precision": 2,
+                "regex": r'^\d+\.?\d{0,2}$'
+            }
+        }
+    },
+    "1098": {
+        "required_fields": ["qualified_mortgage_interest"],
+        "optional_fields": ["property_address", "payer_tin", "recipient_tin"],
+        "field_rules": {
+            "qualified_mortgage_interest": {
+                "type": "currency",
+                "min": 0,
+                "max": 10000000,
+                "precision": 2,
+                "regex": r'^\d+\.?\d{0,2}$'
+            }
+        }
+    },
+    "1098-T": {
+        "required_fields": ["qualified_education_expenses"],
+        "optional_fields": ["scholarships", "payer_tin", "recipient_tin"],
+        "field_rules": {
+            "qualified_education_expenses": {
+                "type": "currency",
+                "min": 0,
+                "max": 10000000,
+                "precision": 2,
+                "regex": r'^\d+\.?\d{0,2}$'
+            },
+            "scholarships": {
+                "type": "currency",
+                "min": 0,
+                "max": 10000000,
+                "precision": 2,
+                "regex": r'^\d+\.?\d{0,2}$'
             }
         }
     }
@@ -606,15 +761,19 @@ def detect_document_type(text: str) -> DocumentType:
     """Detect document type from extracted text"""
     text_lower = text.lower()
     
-    if re.search(r'w[\s-]?2|form\s+w[\s-]?2|wage\s+and\s+tax|box\s+1[\s]*wages', text_lower):
-        print("[DEBUG] Detected document type: W-2")
-        return DocumentType.W2
-    elif re.search(r'1099[\s-]?nec|nonemployee\s+compensation|form\s+1099[\s-]?nec', text_lower):
+    # Check 1099 forms FIRST (more specific patterns) before generic patterns
+    if re.search(r'1099[\s-]?misc|miscellaneous\s+income|form\s+1099[\s-]?misc|royalties|nonemployee\s+compensation.*box\s+7', text_lower):
+        print("[DEBUG] Detected document type: 1099-MISC")
+        return DocumentType.FORM_1099_MISC
+    elif re.search(r'1099[\s-]?nec|form\s+1099[\s-]?nec', text_lower):
         print("[DEBUG] Detected document type: 1099-NEC")
         return DocumentType.FORM_1099_NEC
     elif re.search(r'1099[\s-]?int|interest\s+income|form\s+1099[\s-]?int', text_lower):
         print("[DEBUG] Detected document type: 1099-INT")
         return DocumentType.FORM_1099_INT
+    elif re.search(r'w[\s-]?2|form\s+w[\s-]?2|wage\s+and\s+tax|box\s+1[\s]*wages', text_lower):
+        print("[DEBUG] Detected document type: W-2")
+        return DocumentType.W2
     
     print("[DEBUG] Could not determine document type, marking as UNKNOWN")
     return DocumentType.UNKNOWN
@@ -936,6 +1095,18 @@ def extract_document_fields(text: str, doc_type: DocumentType) -> dict:
         doc_type_str = "1099-NEC"
     elif doc_type == DocumentType.FORM_1099_INT:
         doc_type_str = "1099-INT"
+    elif doc_type == DocumentType.FORM_1099_DIV:
+        doc_type_str = "1099-DIV"
+    elif doc_type == DocumentType.FORM_1099_B:
+        doc_type_str = "1099-B"
+    elif doc_type == DocumentType.FORM_1099_MISC:
+        doc_type_str = "1099-MISC"
+    elif doc_type == DocumentType.FORM_1099_K:
+        doc_type_str = "1099-K"
+    elif doc_type == DocumentType.FORM_1099_OID:
+        doc_type_str = "1099-OID"
+    else:
+        doc_type_str = str(doc_type.value)
     
     print(f"[EXTRACTION] Processing {doc_type_str}...")
     
@@ -959,10 +1130,14 @@ def extract_document_fields(text: str, doc_type: DocumentType) -> dict:
         
         # Debug: Log what we got
         print(f"[DEBUG] Normalized fields count: {len(normalized)}")
-        print(f"[DEBUG] Fields with values: {sum(1 for v in normalized.values() if v > 0)}")
+        print(f"[DEBUG] Fields with values: {sum(1 for v in normalized.values() if isinstance(v, (int, float)) and v > 0)}")
         for key, value in normalized.items():
-            if value > 0:
-                print(f"[DEBUG]   {key}: {value}")
+            try:
+                val_num = float(value) if isinstance(value, str) else value
+                if isinstance(val_num, (int, float)) and val_num > 0:
+                    print(f"[DEBUG]   {key}: {value}")
+            except (ValueError, TypeError):
+                pass
         
         # Convert to document-specific format
         if doc_type == DocumentType.W2:
@@ -1000,9 +1175,64 @@ def extract_document_fields(text: str, doc_type: DocumentType) -> dict:
                 "extraction": extraction,
             }
             return result
+        elif doc_type == DocumentType.FORM_1099_DIV:
+            result = {
+                "document_type": "1099-DIV",
+                "qualified_dividends": normalized.get("qualified_dividends", 0.0) or 0.0,
+                "ordinary_dividends": normalized.get("ordinary_dividends", 0.0) or 0.0,
+                "federal_income_tax_withheld": normalized.get("federal_income_tax_withheld", 0.0) or 0.0,
+                "extraction_method": "llm_agent",
+                "validation": validation,
+                "extraction": extraction,
+            }
+            return result
+        elif doc_type == DocumentType.FORM_1099_B:
+            result = {
+                "document_type": "1099-B",
+                "total_proceeds": normalized.get("total_proceeds", 0.0) or 0.0,
+                "cost_basis": normalized.get("cost_basis", 0.0) or 0.0,
+                "federal_income_tax_withheld": normalized.get("federal_income_tax_withheld", 0.0) or 0.0,
+                "extraction_method": "llm_agent",
+                "validation": validation,
+                "extraction": extraction,
+            }
+            return result
+        elif doc_type == DocumentType.FORM_1099_MISC:
+            result = {
+                "document_type": "1099-MISC",
+                "rents": normalized.get("rents", 0.0) or 0.0,
+                "royalties": normalized.get("royalties", 0.0) or 0.0,
+                "other_income": normalized.get("other_income", 0.0) or 0.0,
+                "nonemployee_compensation": normalized.get("nonemployee_compensation", 0.0) or 0.0,
+                "federal_income_tax_withheld": normalized.get("federal_income_tax_withheld", 0.0) or 0.0,
+                "extraction_method": "llm_agent",
+                "validation": validation,
+                "extraction": extraction,
+            }
+            return result
+        elif doc_type == DocumentType.FORM_1099_K:
+            result = {
+                "document_type": "1099-K",
+                "card_not_present_transactions": normalized.get("card_not_present_transactions", 0.0) or 0.0,
+                "federal_income_tax_withheld": normalized.get("federal_income_tax_withheld", 0.0) or 0.0,
+                "extraction_method": "llm_agent",
+                "validation": validation,
+                "extraction": extraction,
+            }
+            return result
+        elif doc_type == DocumentType.FORM_1099_OID:
+            result = {
+                "document_type": "1099-OID",
+                "original_issue_discount": normalized.get("original_issue_discount", 0.0) or 0.0,
+                "federal_income_tax_withheld": normalized.get("federal_income_tax_withheld", 0.0) or 0.0,
+                "extraction_method": "llm_agent",
+                "validation": validation,
+                "extraction": extraction,
+            }
+            return result
         else:
             result = {
-                "document_type": "UNKNOWN",
+                "document_type": str(doc_type.value),
                 "extraction_method": "llm_agent",
                 "extracted_data": normalized,
                 "validation": validation,

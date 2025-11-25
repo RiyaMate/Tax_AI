@@ -1,0 +1,21 @@
+{
+  "markdown": "# 1099-NEC Form\n\n**Payer:** Tech Company Inc.\n**Recipient:** John Doe\n**TIN:** XX-X-XXXX\n\n## Boxes\n- Box 1 (Nonemployee Compensation): $75,000.00\n- Box 2 (Royalties): $0.00\n- Box 3 (Other Income): $0.00\n- Box 4 (Federal Withheld): $0.00\n- Box 5 (Fishing Proceeds): $0.00\n- Box 6 (PTIN): N/A\n- Box 7 (FATCA Reporting): N/A\n- Box 8 (State/Payer State): CA\n- Box 9 (State/Payer ID): N/A\n- Box 10 (State Income): $0.00\n- Box 11 (State Withheld): $0.00\n",
+  "extracted_values": [
+    {
+      "field": "Box 1 (Nonemployee Compensation)",
+      "value": "75000.00",
+      "confidence": 0.95
+    },
+    {
+      "field": "Federal Income Tax Withheld",
+      "value": "0.00",
+      "confidence": 0.95
+    }
+  ],
+  "key_value_pairs": {
+    "Box 1": "75000.00",
+    "Box 4 (Federal Withheld)": "0.00",
+    "Payer Name": "Tech Company Inc.",
+    "Recipient Name": "John Doe"
+  }
+}
